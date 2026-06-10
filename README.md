@@ -32,3 +32,25 @@ Completion of the take-home assessment does not guarantee qualification, referra
 Thank you again for your interest in public service with the Department of the Treasury.
 
 [Inscructions](https://github.com/treasurytakehome-rgb/instructions)
+
+# Results
+
+### Critical Fields:
+* Brand Name
+* ABV
+* Government Warrning
+
+### Secondary Fields:
+* Bottler Name & Address
+* Varietal Designation
+* Appellation of Origin
+* Vintage Date
+* Net Volume
+* Sulfite Declaration
+
+# Decision Matrix
+Critical Field Invalid -> FAIL
+
+Critical Field Valid + Secondary Fields Missing/Unclear -> REVIEW
+
+All checks pass -> PASS
