@@ -30,3 +30,5 @@ Deliverables:
 Completion of the take-home assessment does not guarantee qualification, referral, interview, selection, or a tentative job offer. Treasury will contact candidates selected for additional review or next steps. Due to the volume of applications, applicants may not receive an individual status update.
 
 Thank you again for your interest in public service with the Department of the Treasury.
+
+[Inscructions](https://github.com/treasurytakehome-rgb/instructions)
