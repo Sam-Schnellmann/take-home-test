@@ -35,9 +35,9 @@ SECONDARY_FIELDS = [
 
 # Readable labels for display and export
 FIELD_LABELS = {
-    "brand name":            "Brand Name",
+    "brand_name":            "Brand Name",
     "abv":                   "ABV (%)",
-    "government warning":    "Government Warning",
+    "government_warning":    "Government Warning",
     "bottler_name_address":  "Bottler Name and Address",
     "varietal_designation":  "Varietal Designation",
     "appellation_of_origin": "Appellation of Origin",
@@ -63,5 +63,5 @@ EXPORT_ZIP_NAME   = "ttb_results.zip"
 
 # XLSX color fills
 XLSX_COLOR_FAIL   = "FFFF4C4C"  # Red
-XLSX_COLOR_REVIEW = "FFFD700"  # Yellow
+XLSX_COLOR_REVIEW = "FFFFD700"  # Yellow
 XLSX_COLOR_PASS   = None  # no fill

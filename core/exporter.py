@@ -31,13 +31,13 @@ def _flatten(result:dict) -> dict:
         row[f"{label} Status"]    = r.get("status", "")
         row[f"{label} Extracted"] = r.get("extracted", "")
         row[f"{label} Expected"]  = r.get("expected", "")
-        row[f"{label} Note"]   = r.get("message", "")
+        row[f"{label} Note"]      = r.get("message", "")
 
     for field, r in result.get("secondary", {}).items():
         label = FIELD_LABELS.get(field, field)
         row[f"{label} Status"]    = r.get("status", "")
         row[f"{label} Extracted"] = r.get("extracted", "")
-        row[f"{label} Note"]   = r.get("message", "")
+        row[f"{label} Note"]      = r.get("message", "")
 
     return row
 
@@ -78,7 +78,7 @@ def _build_xlsx(results: list[dict]) -> bytes:
     fill_review = PatternFill("solid", fgColor=XLSX_COLOR_REVIEW)
  
     for row_idx, row_data in enumerate(rows, start=2):
-        overall = row_data.get("overall_status", "")
+        overall = row_data.get("overall", "")
         if overall == FAIL:
             row_fill = fill_fail
         elif overall == REVIEW:

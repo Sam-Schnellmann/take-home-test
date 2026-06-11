@@ -183,9 +183,9 @@ def validate_label(ocr_data: dict, user_brand: str, user_abv: str) -> dict:
         missing_secondary:  [list of human readable field names]
     }
     """
-    brand_result      = validate_brand_name(ocr_data.get("brand name"), user_brand)
+    brand_result      = validate_brand_name(ocr_data.get("brand_name"), user_brand)
     abv_result        = validate_abv(ocr_data.get("abv"), user_abv)
-    warning_result    = validate_government_warning(ocr_data.get("government warning"))
+    warning_result    = validate_government_warning(ocr_data.get("government_warning"))
     secondary_results = validate_secondary_fields(ocr_data.get("secondary", {}))
 
     # Determine the overall status
