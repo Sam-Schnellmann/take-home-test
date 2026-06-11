@@ -91,7 +91,7 @@ notes:
         - Again, run it locally. Only the local machine would have access to all input
         and output data. Maybe include a button to export data once it files up.
             - Export btn as both JSON and CSV
-            - Maybe XSLX too, but that might be too much from what Ms. Chen asked for
+            - Maybe XLSX too, but that might be too much from what Ms. Chen asked for
 
     - Cloud network blocks outbound traffic. Cloud APIs might be blocked
 
@@ -192,10 +192,10 @@ Notes on project:
             the application verifies a core set of common fields and can be extended with 
             beverage-specific validation rules.
 
-        - Maybe, just one btn that exports a zip of JSON, XSLX, and CSV
+        - Maybe, just one btn that exports a zip of JSON, XLSX, and CSV
                 - user dosen't have to choose which file. Fast and efficient
 
-            - Color code the results in XSLX?
+            - Color code the results in XLSX?
                 - RED - BAD
                 - YELLOW - REVIEW
                 - no color - GOOD

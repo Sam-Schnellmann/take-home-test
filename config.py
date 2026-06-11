@@ -58,7 +58,7 @@ OLLAMA_MODEL = "llama3"
 # Export filenames
 EXPORT_JSON_NAME  = "ttb_results.json"
 EXPORT_CSV_NAME   = "ttb_results.csv"
-EXPORT_EXCEL_NAME = "ttb_results.xlsx"
+EXPORT_XLSX_NAME = "ttb_results.xlsx"
 EXPORT_ZIP_NAME   = "ttb_results.zip"
 
 # XLSX color fills

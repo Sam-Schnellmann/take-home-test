@@ -28,15 +28,16 @@ def preprocess_image(pil_image: Image.Image) -> np.ndarray:
         gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
     
     # Denoise
-    gray = cv2.fastN1MeansDenoising(gray, h=15)
+    gray = cv2.fastNlMeansDenoising(gray, h=15)
 
     # Adaptive threshold
     binary = cv2.adaptiveThreshold(
-        gray, 255,
+        gray,
+        255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY,
-        blockSize=31,
-        c=10,
+        11,
+        2,
     )
 
     return binary
