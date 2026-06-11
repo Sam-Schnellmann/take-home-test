@@ -1,196 +1,114 @@
-import os
-import re
-import cv2
-import numpy as np
-import pytesseract
+import io
+import base64
+import json
+ 
+import anthropic
 from PIL import Image
-
-from config import TESSERACT_CMD
-
-# Point pytesseract at windows binary if the path is set
-if TESSERACT_CMD:
-    pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
-
-# image processing and OCR functions
-def preprocess_image(pil_image: Image.Image) -> np.ndarray:
-    """
-    Convert a PIL image to a cleaned-up grayscale numpy array ready for
-    Tesseract. Applies: grayscale -> resize up -> denoise -> adaptive threshold.
-    Returns the processed image as a numpy array.
-    """
-    img = np.array(pil_image.convert("RGB"))
-    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-
-    # Scale up
-    h, w = gray.shape
-    if max(h, w) < 1200:
-        scale = 1200 / max(h, w)
-        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-    
-    # Denoise
-    gray = cv2.fastNlMeansDenoising(gray, h=15)
-
-    # Adaptive threshold
-    binary = cv2.adaptiveThreshold(
-        gray,
-        255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY,
-        11,
-        2,
-    )
-
-    return binary
-
-# OCR function
-def extract_raw_text(pil_image: Image.Image) -> str:
-    """
-    Run tesseract on a PIL image and return the raw text string.
-    The image is preprocessed first. Whitespace is normalized but
-    line structure is kept so field extractors can search by line.
-    """
-    processed = preprocess_image(pil_image)
-    config = "--oem 3 --psm 6" # uniform block of text
-    raw = pytesseract.image_to_string(processed, config=config)
-    return raw
-
-# Field extraction helpers
-def normalize_whitespace(text: str) -> str:
-    """
-    Collapse all whitespace / new lines into single spaces.
-    """
-    return " ".join(text.split())
-
-def extract_brand_name(raw_text: str) -> str | None:
-    """
-    Attempt to find the brand name. Strategy: the brand name is usually the
-    largest / first prominent text block, often on its own line near the top.
-    We return the first non-empty, non-numeric line that is fewer than 60 chars.
-    Callers compare this against the user-supplied expected value.
-    Returns None if nothing plausible is found.
-    """
-    lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
-    for line in lines:
-        # Skip lines that are purely numbers / symbols
-        if re.fullmatch(r"[\d\W]+", line):
-            continue
-        # Skip lines longer than a reasonable brand name
-        if len(line) > 60:
-            continue
-        return line
-    return None
+ 
+from config import ANTHROPIC_MODEL
+ 
+# Anthropic client — reads ANTHROPIC_API_KEY from environment automatically
+_client = anthropic.Anthropic()
  
  
-def extract_abv(raw_text: str) -> str | None:
-    """
-    Find an ABV percentage in the raw OCR text.
-    Looks for patterns like: 13.5%, 13.5% ALC/VOL, ALC. 13.5% BY VOL, etc.
-    Returns just the numeric string (e.g. "13.5") or None.
-    """
-    pattern = re.compile(
-        r"(?:ALC(?:OHOL)?\.?\s*(?:BY\s*VOL(?:UME)?)?\.?\s*)?"
-        r"(\d{1,2}(?:\.\d{1,2})?)\s*%",
-        re.IGNORECASE,
-    )
-    match = pattern.search(raw_text)
-    if match:
-        return match.group(1)
-    return None
+def _pil_to_base64(pil_image: Image.Image) -> str:
+    """Convert a PIL image to a base64-encoded PNG string for the API."""
+    buf = io.BytesIO()
+    pil_image.save(buf, format="PNG")
+    return base64.standard_b64encode(buf.getvalue()).decode("utf-8")
  
  
-def extract_government_warning(raw_text: str) -> str | None:
-    """
-    Find and return the full government warning block from the OCR text.
-    Searches for 'GOVERNMENT WARNING' (case-insensitive for location only)
-    then grabs everything from that point to the end of the warning block.
-    Returns the extracted text normalized to single-spaced, or None.
-    """
-    # Find the start position — case-insensitive search for location
-    upper = raw_text.upper()
-    start = upper.find("GOVERNMENT WARNING")
-    if start == -1:
-        return None
- 
-    # Take text from that point onward, up to ~600 chars (warning is ~400 chars)
-    candidate = raw_text[start : start + 650]
-    return normalize_whitespace(candidate)
- 
- 
-def extract_secondary_fields(raw_text: str) -> dict[str, str | None]:
-    """
-    Best-effort extraction of secondary label fields using pattern matching.
-    Returns a dict of field_key → extracted string (or None if not found).
-    These are used for REVIEW logic only — no exact-match required.
-    """
-    text_upper = raw_text.upper()
-    results = {}
- 
-    # Bottler / producer line — look for keywords
-    bottler_pattern = re.compile(
-        r"((?:BOTTLED|PRODUCED|VINTED|IMPORTED)\s+(?:BY|FOR|AND\s+BOTTLED\s+BY)[^\n]{5,80})",
-        re.IGNORECASE,
-    )
-    m = bottler_pattern.search(raw_text)
-    results["bottler_name_address"] = normalize_whitespace(m.group(1)) if m else None
- 
-    # Varietal designation — common wine/spirit type words
-    varietal_pattern = re.compile(
-        r"\b(CABERNET|MERLOT|CHARDONNAY|PINOT|RIESLING|SAUVIGNON|ZINFANDEL|"
-        r"MALBEC|SYRAH|SHIRAZ|BOURBON|WHISKEY|WHISKY|VODKA|RUM|GIN|TEQUILA|"
-        r"BRANDY|COGNAC|SCOTCH|LAGER|ALE|STOUT|IPA|PORTER)\b",
-        re.IGNORECASE,
-    )
-    m = varietal_pattern.search(raw_text)
-    results["varietal_designation"] = m.group(0).title() if m else None
- 
-    # Appellation of origin — State / country / AVA patterns
-    appellation_pattern = re.compile(
-        r"\b(NAPA VALLEY|SONOMA|BURGUNDY|BORDEAUX|TUSCANY|RIOJA|CALIFORNIA|"
-        r"OREGON|WASHINGTON|FRANCE|ITALY|SPAIN|AUSTRALIA|CHILE|ARGENTINA|"
-        r"KENTUCKY|TENNESSEE|SCOTLAND|IRELAND|MEXICO)\b",
-        re.IGNORECASE,
-    )
-    m = appellation_pattern.search(raw_text)
-    results["appellation_of_origin"] = m.group(0).title() if m else None
- 
-    # Vintage date — 4-digit year between 1900 and 2099
-    vintage_pattern = re.compile(r"\b(19\d{2}|20\d{2})\b")
-    m = vintage_pattern.search(raw_text)
-    results["vintage_date"] = m.group(1) if m else None
- 
-    # Net volume — e.g. 750 mL, 1.5L, 750ML
-    volume_pattern = re.compile(
-        r"(\d{1,4}(?:\.\d{1,2})?\s*(?:ML|mL|L|liters?|litres?))",
-        re.IGNORECASE,
-    )
-    m = volume_pattern.search(raw_text)
-    results["net_volume"] = normalize_whitespace(m.group(1)) if m else None
- 
-    # Sulfite declaration
-    sulfite_pattern = re.compile(
-        r"(CONTAINS?\s+SULFITES?|CONTAINS?\s+ADDED\s+SULFITES?)",
-        re.IGNORECASE,
-    )
-    m = sulfite_pattern.search(raw_text)
-    results["sulfite_declaration"] = m.group(0).title() if m else None
- 
-    return results
- 
- 
-# Main
 def process_image(pil_image: Image.Image) -> dict:
     """
-    Full OCR pipeline for a single label image.
+    Full OCR pipeline for a single label image using Claude Haiku vision.
+ 
+    Sends the image to the Anthropic API and asks for structured JSON extraction
+    of all label fields. No local Tesseract install required.
+ 
     Returns a dict with:
-      - raw_text: everything Tesseract saw
-      - brand_name, abv, government_warning: extracted Big 3 values (or None)
-      - secondary: dict of secondary field extractions
+      - raw_text:           everything Claude read from the label (for diagnostics)
+      - brand_name:         extracted brand name string, or None
+      - abv:                numeric ABV string (e.g. "13.5"), or None
+      - government_warning: full government warning text, or None
+      - secondary:          dict of secondary field extractions
     """
-    raw = extract_raw_text(pil_image)
-    return {
-        "raw_text":          raw,
-        "brand_name":        extract_brand_name(raw),
-        "abv":               extract_abv(raw),
-        "government_warning":extract_government_warning(raw),
-        "secondary":         extract_secondary_fields(raw),
-    }
+    img_b64 = _pil_to_base64(pil_image)
+ 
+    prompt = """You are an alcohol label reader. Carefully examine this label image and extract the text fields listed below. The label may have two panels (front and back) — read both.
+ 
+Return ONLY a valid JSON object with exactly these keys. Do not include any explanation, markdown, or code fences — just the raw JSON.
+ 
+{
+  "raw_text": "<all visible text on the label, exactly as printed>",
+  "brand_name": "<the brand or product name, exactly as it appears — preserve capitalization>",
+  "abv": "<just the numeric ABV value, e.g. 13.5 — no % sign>",
+  "government_warning": "<the full government warning block, exactly as printed including header>",
+  "secondary": {
+    "bottler_name_address": "<bottler or producer name and address, or null>",
+    "varietal_designation": "<wine/spirit type e.g. Chardonnay, Bourbon, IPA, or null>",
+    "appellation_of_origin": "<region/country of origin e.g. Napa Valley, Kentucky, or null>",
+    "vintage_date": "<4-digit vintage year, or null>",
+    "net_volume": "<volume with unit e.g. 750 mL, 1 PINT, or null>",
+    "sulfite_declaration": "<sulfite statement if present, or null>"
+  }
+}
+ 
+Use null (not the string "null") for any field you cannot find on the label.
+For brand_name, preserve exact capitalization and punctuation as printed.
+For abv, return only the number — no % sign, no units.
+For government_warning, copy the full text exactly as it appears on the label."""
+ 
+    try:
+        response = _client.messages.create(
+            model=ANTHROPIC_MODEL,
+            max_tokens=1000,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type":       "base64",
+                                "media_type": "image/png",
+                                "data":       img_b64,
+                            },
+                        },
+                        {
+                            "type": "text",
+                            "text": prompt,
+                        },
+                    ],
+                }
+            ],
+        )
+ 
+        raw_json = response.content[0].text.strip()
+ 
+        # Strip accidental markdown fences if the model added them
+        if raw_json.startswith("```"):
+            raw_json = raw_json.split("```")[1]
+            if raw_json.startswith("json"):
+                raw_json = raw_json[4:]
+            raw_json = raw_json.strip()
+ 
+        data = json.loads(raw_json)
+ 
+        return {
+            "raw_text":           data.get("raw_text") or "",
+            "brand_name":         data.get("brand_name") or None,
+            "abv":                data.get("abv") or None,
+            "government_warning": data.get("government_warning") or None,
+            "secondary":          data.get("secondary") or {},
+        }
+ 
+    except Exception as e:
+        # Degrade gracefully — return empty extraction rather than crashing the app
+        return {
+            "raw_text":           "",
+            "brand_name":         None,
+            "abv":                None,
+            "government_warning": None,
+            "secondary":          {},
+            "_error":             str(e),
+        }

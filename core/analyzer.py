@@ -1,16 +1,21 @@
-import ollama
-from config import PASS, REVIEW, FAIL, OLLAMA_MODEL, FIELD_LABELS
+import anthropic
+ 
+from config import PASS, REVIEW, FAIL, ANTHROPIC_MODEL, FIELD_LABELS
+ 
+# Anthropic client — reads ANTHROPIC_API_KEY from environment automatically
+_client = anthropic.Anthropic()
  
  
 def _build_prompt(validation_result: dict, filename: str) -> str:
+    """Build a concise prompt describing what went wrong on the label."""
     overall = validation_result["overall"]
     lines = [f'Label file: "{filename}"', f"Overall result: {overall}", ""]
  
     if overall == FAIL:
         lines.append("The following required fields FAILED:")
         for field in ["brand_name", "abv", "government_warning"]:
-            r = validation_result[field]
-            if r["status"] == FAIL:
+            r = validation_result.get(field, {})
+            if r.get("status") == FAIL:
                 lines.append(f"  - {FIELD_LABELS[field]}: {r['message']}")
         lines.append("")
         lines.append(
@@ -38,9 +43,9 @@ def _build_prompt(validation_result: dict, filename: str) -> str:
  
 def get_explanation(validation_result: dict, filename: str = "label") -> str:
     """
-    Returns a plain-text explanation string from Ollama.
+    Returns a plain-text explanation string from Claude Haiku.
     Returns an empty string for PASS results (no explanation needed).
-    Returns a fallback message if Ollama is unavailable.
+    Returns a fallback message if the API call fails.
     """
     if validation_result["overall"] == PASS:
         return ""
@@ -48,14 +53,15 @@ def get_explanation(validation_result: dict, filename: str = "label") -> str:
     prompt = _build_prompt(validation_result, filename)
  
     try:
-        response = ollama.chat(
-            model=OLLAMA_MODEL,
+        response = _client.messages.create(
+            model=ANTHROPIC_MODEL,
+            max_tokens=1000,
             messages=[{"role": "user", "content": prompt}],
         )
-        return response["message"]["content"].strip()
+        return response.content[0].text.strip()
+ 
     except Exception as e:
-        # Ollama may not be running — degrade gracefully, don't crash the app
         return (
-            f"(AI explanation unavailable — is Ollama running? Error: {e})\n\n"
+            f"(AI explanation unavailable — check your ANTHROPIC_API_KEY. Error: {e})\n\n"
             "Manual review required based on the field results above."
         )
