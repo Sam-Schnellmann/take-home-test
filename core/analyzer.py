@@ -3,12 +3,12 @@ import streamlit as st
  
 from config import PASS, REVIEW, FAIL, ANTHROPIC_MODEL, FIELD_LABELS
  
-# Anthropic client — reads ANTHROPIC_API_KEY from environment automatically
+# Anthropic client
 _client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
  
  
 def _build_prompt(validation_result: dict, filename: str) -> str:
-    """Build a concise prompt describing what went wrong on the label."""
+    # Build a concise prompt describing what went wrong on the label.
     overall = validation_result["overall"]
     lines = [f'Label file: "{filename}"', f"Overall result: {overall}", ""]
  
@@ -44,9 +44,9 @@ def _build_prompt(validation_result: dict, filename: str) -> str:
  
 def get_explanation(validation_result: dict, filename: str = "label") -> str:
     """
-    Returns a plain-text explanation string from Claude Haiku.
-    Returns an empty string for PASS results (no explanation needed).
-    Returns a fallback message if the API call fails.
+    Returns a plain-text explanation string from Claude.
+    Empty string for PASS results (no explanation needed).
+    Fallback message if the API call fails.
     """
     if validation_result["overall"] == PASS:
         return ""
@@ -63,6 +63,6 @@ def get_explanation(validation_result: dict, filename: str = "label") -> str:
  
     except Exception as e:
         return (
-            f"(AI explanation unavailable — check your ANTHROPIC_API_KEY. Error: {e})\n\n"
+            f"(AI explanation unavailable — check ANTHROPIC_API_KEY. Error: {e})\n\n"
             "Manual review required based on the field results above."
         )

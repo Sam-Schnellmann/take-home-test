@@ -9,12 +9,13 @@ from config import ANTHROPIC_MODEL
 
 import streamlit as st
  
-# Anthropic client — reads ANTHROPIC_API_KEY from environment automatically
+# using Claude because it's easier to just give someone a link to this app instead
+# of them having to download Google's Tesseract OCR
 _client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
  
  
 def _pil_to_base64(pil_image: Image.Image) -> str:
-    """Convert a PIL image to a base64-encoded PNG string for the API."""
+    # Convert this PIL image to a base64-encoded PNG string for the API.
     buf = io.BytesIO()
     pil_image.save(buf, format="PNG")
     return base64.standard_b64encode(buf.getvalue()).decode("utf-8")
@@ -22,9 +23,9 @@ def _pil_to_base64(pil_image: Image.Image) -> str:
  
 def process_image(pil_image: Image.Image) -> dict:
     """
-    Full OCR pipeline for a single label image using Claude Haiku vision.
+    Full OCR pipeline for a single label image using Claude.
  
-    Sends the image to the Anthropic API and asks for structured JSON extraction
+    Sends the image to the Anthropic API. Asks for structured JSON extraction
     of all label fields. No local Tesseract install required.
  
     Returns a dict with:
@@ -73,12 +74,12 @@ For government_warning, copy the full text exactly as it appears on the label.""
                             "source": {
                                 "type":       "base64",
                                 "media_type": "image/png",
-                                "data":       img_b64,
+                                "data":        img_b64,
                             },
                         },
                         {
                             "type": "text",
-                            "text": prompt,
+                            "text":  prompt,
                         },
                     ],
                 }
@@ -87,7 +88,7 @@ For government_warning, copy the full text exactly as it appears on the label.""
  
         raw_json = response.content[0].text.strip()
  
-        # Strip accidental markdown fences if the model added them
+        # Get rid of the markdown stuff
         if raw_json.startswith("```"):
             raw_json = raw_json.split("```")[1]
             if raw_json.startswith("json"):
@@ -105,7 +106,7 @@ For government_warning, copy the full text exactly as it appears on the label.""
         }
  
     except Exception as e:
-        # Degrade gracefully — return empty extraction rather than crashing the app
+        # return empty extraction rather than crash the app
         return {
             "raw_text":           "",
             "brand_name":         None,

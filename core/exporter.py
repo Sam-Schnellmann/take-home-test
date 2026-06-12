@@ -15,10 +15,9 @@ from config import (
 )
  
  
-# ── Flatten ───────────────────────────────────────────────────────────────────
- 
+# Flatten
 def _flatten(result: dict) -> dict:
-    """Convert a validation result dict into a flat row suitable for CSV/XLSX."""
+    # Convert a validation result into a flat row for Excel.
     row = {
         "Filename":    result.get("filename", ""),
         "Timestamp":   result.get("timestamp", ""),
@@ -45,14 +44,12 @@ def _flatten(result: dict) -> dict:
     return row
  
  
-# ── JSON ──────────────────────────────────────────────────────────────────────
- 
+# JSON
 def _build_json(results: list[dict]) -> bytes:
     return json.dumps(results, indent=2).encode("utf-8")
  
  
-# ── CSV ───────────────────────────────────────────────────────────────────────
- 
+# CSV
 def _build_csv(results: list[dict]) -> bytes:
     rows = [_flatten(r) for r in results]
     df   = pd.DataFrame(rows)
@@ -61,8 +58,7 @@ def _build_csv(results: list[dict]) -> bytes:
     return buf.getvalue().encode("utf-8")
  
  
-# ── XLSX ──────────────────────────────────────────────────────────────────────
- 
+# XLSX
 def _build_xlsx(results: list[dict]) -> bytes:
     rows = [_flatten(r) for r in results]
     if not rows:
@@ -89,7 +85,6 @@ def _build_xlsx(results: list[dict]) -> bytes:
     fill_review = PatternFill("solid", fgColor=XLSX_COLOR_REVIEW)
  
     for row_idx, row_data in enumerate(rows, start=2):
-        # Bug fix: was "overall_status" — the correct key is "Overall"
         overall = row_data.get("Overall", "")
         if overall == FAIL:
             row_fill = fill_fail
@@ -104,7 +99,7 @@ def _build_xlsx(results: list[dict]) -> bytes:
             if row_fill:
                 cell.fill = row_fill
  
-    # Auto-size columns (capped at 60 chars wide)
+    # Auto-size columns
     for col in ws.columns:
         max_len = max(
             (len(str(cell.value)) if cell.value else 0 for cell in col),
@@ -117,8 +112,7 @@ def _build_xlsx(results: list[dict]) -> bytes:
     return buf.getvalue()
  
  
-# ── ZIP ───────────────────────────────────────────────────────────────────────
- 
+# ZIP folder for the three exports
 def build_export_zip(results: list[dict]) -> bytes:
     """
     Build an in-memory ZIP containing JSON, CSV, and XLSX.

@@ -12,13 +12,12 @@ def normalize_whitespace(text: str) -> str:
     return " ".join(text.split())
  
  
-# ── Brand Name ────────────────────────────────────────────────────────────────
- 
+# Brand Name
 def validate_brand_name(extracted: str | None, expected: str) -> dict:
     """
     Exact, case-sensitive match after whitespace normalization.
     extracted: what the API pulled off the label
-    expected:  what the user entered as the correct value
+    expected:  what the user entered as the CORRECT value
     """
     if not extracted:
         return {
@@ -39,7 +38,7 @@ def validate_brand_name(extracted: str | None, expected: str) -> dict:
             "message":   "Brand name matches expected value.",
         }
  
-    # Give the agent a useful diff hint
+    # Give the agent a useful hint
     if extracted_norm.upper() == expected_norm.upper():
         hint = "Capitalization mismatch: check case on every word."
     else:
@@ -53,15 +52,14 @@ def validate_brand_name(extracted: str | None, expected: str) -> dict:
     }
  
  
-# ── ABV ───────────────────────────────────────────────────────────────────────
- 
+# ABV
 def validate_abv(extracted: str | None, expected: str) -> dict:
     """
     Numeric comparison of ABV percentages.
     extracted : numeric string from the API (e.g. "13.5")
     expected  : what the user typed (e.g. "13.5" or "13.5%")
     """
-    expected_clean = re.sub(r"[%\s]", "", expected).strip()
+    expected_clean = re.sub(r"[%\s]", "", expected).strip() # Get rid of the % for QA
  
     if not extracted:
         return {
@@ -97,17 +95,13 @@ def validate_abv(extracted: str | None, expected: str) -> dict:
         "message":   f"ABV on label is {extracted_f}%, expected {expected_f}%.",
     }
  
- 
-# ── Government Warning ────────────────────────────────────────────────────────
- 
+
+# GOVERNMENT WARNING <- has to be capitalized like that 
 def validate_government_warning(extracted: str | None) -> dict:
     """
-    The government warning must match the canonical text EXACTLY
+    The government warning must match the text EXACTLY
     (after whitespace normalization). No fuzzy auto-correction — a real
     spelling mistake on the label should be a real failure.
- 
-    We still report a fuzzy similarity score to help agents distinguish
-    OCR noise from genuine label errors.
     """
     canonical = normalize_whitespace(GOVERNMENT_WARNING)
  
@@ -149,8 +143,7 @@ def validate_government_warning(extracted: str | None) -> dict:
     }
  
  
-# ── Secondary Fields ──────────────────────────────────────────────────────────
- 
+# Secondary Fields (proper_verification.jpg)
 def validate_secondary_fields(extracted_secondary: dict) -> dict:
     """
     For each secondary field, determine if it was found or missing.
@@ -174,15 +167,8 @@ def validate_secondary_fields(extracted_secondary: dict) -> dict:
     return results
  
  
-# ── Master Validation ─────────────────────────────────────────────────────────
- 
+# The Actual Validation
 def validate_label(ocr_data: dict, user_brand: str, user_abv: str) -> dict:
-    """
-    Run all validations and return a single result dict.
- 
-    ocr_data keys must use underscores (brand_name, abv, government_warning, secondary)
-    — matching what process_image() returns.
-    """
     brand_result      = validate_brand_name(ocr_data.get("brand_name"), user_brand)
     abv_result        = validate_abv(ocr_data.get("abv"), user_abv)
     warning_result    = validate_government_warning(ocr_data.get("government_warning"))

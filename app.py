@@ -1,11 +1,3 @@
-# import streamlit as st
-
-# st.title("Alcohol Label Verifier")
-# st.write("It's alive")
-
-# app.py — TTB Label Compliance Checker
-# Run with: streamlit run app.py
- 
 import io
 import zipfile
 from datetime import datetime
@@ -26,18 +18,16 @@ from core.analyzer import get_explanation
 from core.exporter import build_export_zip
  
  
-# ── Page config ───────────────────────────────────────────────────────────────
- 
+# set up the page
 st.set_page_config(
     page_title="TTB Label Compliance Checker",
     page_icon="🍷",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
- 
- 
-# ── Styling ───────────────────────────────────────────────────────────────────
- 
+
+
+# CSS styles
 st.markdown("""
 <style>
 /* ── Global ── */
@@ -90,16 +80,12 @@ html, body, [class*="css"] { font-family: 'Segoe UI', sans-serif; }
 }
 </style>
 """, unsafe_allow_html=True)
- 
- 
-# ── Session state init ─────────────────────────────────────────────────────────
- 
+
+
 if "results" not in st.session_state:
     st.session_state.results = []   # accumulated across multiple runs
- 
- 
-# ── Helpers ───────────────────────────────────────────────────────────────────
- 
+
+# helpers
 def badge_html(status: str) -> str:
     css = {"PASS": "pass", "REVIEW": "review", "FAIL": "fail"}.get(status, "fail")
     return f'<span class="badge badge-{css}">{status}</span>'
@@ -182,16 +168,14 @@ def render_result(result: dict):
         st.markdown('<div class="section-header">AI Analysis</div>', unsafe_allow_html=True)
         st.info(result["explanation"])
  
- 
-# ── Layout ────────────────────────────────────────────────────────────────────
- 
+
+# layout 
 st.title("🍷 TTB Label Compliance Checker")
 st.caption("Upload a label image and enter the expected values to verify compliance.")
  
 st.divider()
  
-# ── Input columns ─────────────────────────────────────────────────────────────
- 
+# input blocks
 left, right = st.columns([1, 1], gap="large")
  
 with left:
@@ -222,13 +206,10 @@ with right:
  
 st.divider()
  
-# ── Run button ────────────────────────────────────────────────────────────────
- 
+# run analysis button
 run_col, _ = st.columns([1, 3])
 with run_col:
     go = st.button("▶ Run Check", type="primary", width='stretch')
- 
-# ── Processing ────────────────────────────────────────────────────────────────
  
 if go:
     if not uploaded_file:
@@ -240,7 +221,7 @@ if go:
     else:
         new_results = []
  
-        # ── ZIP / batch mode ──
+        # Zip batch
         if uploaded_file.name.lower().endswith(".zip"):
             zip_bytes = uploaded_file.read()
             with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
@@ -281,7 +262,7 @@ if go:
                         )
                     progress.empty()
  
-        # ── Single image mode ──
+        # Only one image uploaded
         else:
             pil_img = Image.open(uploaded_file)
             result = run_single(
@@ -292,10 +273,10 @@ if go:
             )
             new_results.append(result)
  
-        # Append to session history
+        # history
         st.session_state.results.extend(new_results)
  
-        # Show results immediately
+        # Show results
         st.divider()
         st.subheader("Results")
         for result in new_results:
@@ -303,8 +284,7 @@ if go:
                 render_result(result)
  
  
-# ── Session history summary ───────────────────────────────────────────────────
- 
+# Session history
 if st.session_state.results:
     st.divider()
  
