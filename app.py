@@ -6,6 +6,13 @@ from pathlib import Path
 import streamlit as st
 from PIL import Image
  
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    HEIC_SUPPORTED = True
+except ImportError:
+    HEIC_SUPPORTED = False
+
 from config import (
     PASS, REVIEW, FAIL,
     ACCEPTED_IMAGE_EXTENSIONS,
@@ -30,10 +37,10 @@ st.set_page_config(
 # CSS styles
 st.markdown("""
 <style>
-/* ── Global ── */
+/* Global */
 html, body, [class*="css"] { font-family: 'Segoe UI', sans-serif; }
  
-/* ── Status badges ── */
+/* Status badges */
 .badge {
     display: inline-block;
     padding: 0.35em 1.1em;
@@ -47,7 +54,7 @@ html, body, [class*="css"] { font-family: 'Segoe UI', sans-serif; }
 .badge-review { background: #b58a00; color: #ffffff; }
 .badge-fail   { background: #c0392b; color: #ffffff; }
  
-/* ── Field result rows ── */
+/* Field result rows */
 .field-row {
     display: flex;
     align-items: flex-start;
@@ -67,7 +74,7 @@ html, body, [class*="css"] { font-family: 'Segoe UI', sans-serif; }
 .field-label { font-weight: 600; min-width: 200px; }
 .field-msg   { color: #444; font-size: 0.95rem; }
  
-/* ── Section headers ── */
+/* Section headers */
 .section-header {
     font-size: 0.78rem;
     font-weight: 700;
@@ -78,12 +85,30 @@ html, body, [class*="css"] { font-family: 'Segoe UI', sans-serif; }
     border-bottom: 1px solid #ddd;
     padding-bottom: 4px;
 }
+            
+/* Thumbnail strip */
+.thumb-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 480px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+.thumb-active {
+    outline: 3px solid #1a7a4a;
+    border-radius: 6px;
+}
 </style>
 """, unsafe_allow_html=True)
 
 
 if "results" not in st.session_state:
-    st.session_state.results = []   # accumulated across multiple runs
+    st.session_state.results = []
+if "staged_images" not in st.session_state:
+    st.session_state.staged_images = []
+if "active_idx" not in st.session_state:
+    st.session_state.active_idx = 0
 
 # helpers
 def badge_html(status: str) -> str:
@@ -109,6 +134,68 @@ def render_field_row(label: str, status: str, message: str, extracted: str = "")
         unsafe_allow_html=True,
     )
  
+
+def open_pil(file_bytes: bytes, filename: str) -> Image.Image | None:
+    """Safely open any supported image format, including HEIC."""
+    try:
+        return Image.open(io.BytesIO(file_bytes)).convert("RGB")
+    except Exception:
+        return None
+ 
+ 
+def load_images_from_upload(uploaded_files) -> list[dict]:
+    """
+    Accept a list of uploaded file objects (single or multi-select).
+    Returns list of {"name": str, "pil": Image}.
+    Skips unsupported files and warns the user.
+    """
+    images   = []
+    skipped  = []
+    accepted = ACCEPTED_IMAGE_EXTENSIONS | {".webp", ".heic", ".heif"}
+ 
+    for f in uploaded_files:
+        suffix = Path(f.name).suffix.lower()
+        if suffix not in accepted:
+            skipped.append(f.name)
+            continue
+        pil = open_pil(f.read(), f.name)
+        if pil:
+            images.append({"name": f.name, "pil": pil})
+        else:
+            skipped.append(f.name)
+ 
+    if skipped:
+        st.warning(f"Skipped {len(skipped)} unsupported file(s): " + ", ".join(skipped))
+ 
+    return images
+ 
+ 
+def load_images_from_zip(zip_file) -> list[dict]:
+    """Extract all supported images from an uploaded ZIP file."""
+    accepted = ACCEPTED_IMAGE_EXTENSIONS | {".webp", ".heic", ".heif"}
+    images   = []
+    skipped  = []
+ 
+    zip_bytes = zip_file.read()
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+        for member in zf.namelist():
+            suffix = Path(member).suffix.lower()
+            if member.endswith("/"):
+                continue
+            if suffix not in accepted:
+                skipped.append(member)
+                continue
+            pil = open_pil(zf.read(member), member)
+            if pil:
+                images.append({"name": Path(member).name, "pil": pil})
+            else:
+                skipped.append(member)
+ 
+    if skipped:
+        st.warning(f"Skipped {len(skipped)} unsupported file(s): " + ", ".join(skipped))
+ 
+    return images
+
  
 def run_single(pil_image: Image.Image, filename: str, brand: str, abv: str) -> dict:
     """Full pipeline for one image. Returns result dict."""
@@ -135,14 +222,14 @@ def run_single(pil_image: Image.Image, filename: str, brand: str, abv: str) -> d
 def render_result(result: dict):
     overall = result["overall"]
  
-    # ── Overall badge ──
+    # Overall badge
     col1, col2 = st.columns([3, 1])
     with col1:
         st.markdown(f"### {result['filename']}")
     with col2:
         st.markdown(badge_html(overall), unsafe_allow_html=True)
  
-    # ── Big 3 ──
+    # Big 3
     st.markdown('<div class="section-header">Required Fields</div>', unsafe_allow_html=True)
     for field in ["brand_name", "abv", "government_warning"]:
         r = result.get(field, {})
@@ -153,7 +240,7 @@ def render_result(result: dict):
             r.get("extracted", "") or "",
         )
  
-    # ── Secondary ──
+    # Secondary
     st.markdown('<div class="section-header">Secondary Fields</div>', unsafe_allow_html=True)
     for field, r in result.get("secondary", {}).items():
         render_field_row(
@@ -163,7 +250,7 @@ def render_result(result: dict):
             r.get("extracted", "") or "",
         )
  
-    # ── Explanation ──
+    # Explanation
     if result.get("explanation"):
         st.markdown('<div class="section-header">AI Analysis</div>', unsafe_allow_html=True)
         st.info(result["explanation"])
@@ -172,134 +259,175 @@ def render_result(result: dict):
 # layout 
 st.title("🍷 TTB Label Compliance Checker")
 st.caption("Upload a label image and enter the expected values to verify compliance.")
- 
 st.divider()
  
-# input blocks
-left, right = st.columns([1, 1], gap="large")
+
+# Upload section
+upload_tab, camera_tab = st.tabs(["📁 Upload Images", "📷 Use Camera"])
  
-with left:
-    st.subheader("Upload Label")
-    uploaded_file = st.file_uploader(
-        "Drop an image or ZIP batch here",
-        type=["jpg", "jpeg", "png", "zip"],
+with upload_tab:
+    accepted_types = ["jpg", "jpeg", "png", "webp", "zip"]
+    if HEIC_SUPPORTED:
+        accepted_types += ["heic", "heif"]
+ 
+    uploaded_files = st.file_uploader(
+        "Drop images or a ZIP here — select multiple with Ctrl/Cmd+Click",
+        type=accepted_types,
+        accept_multiple_files=True,
         label_visibility="collapsed",
     )
  
-    if uploaded_file and uploaded_file.type.startswith("image"):
-        st.image(uploaded_file, width='stretch')
+    if uploaded_files:
+        # Separate ZIPs from image uploads
+        zip_files   = [f for f in uploaded_files if f.name.lower().endswith(".zip")]
+        image_files = [f for f in uploaded_files if not f.name.lower().endswith(".zip")]
  
-with right:
-    st.subheader("Expected Values")
-    brand_input = st.text_input(
-        "Brand Name",
-        placeholder="Exactly as it should appear on the label",
-    )
-    abv_input = st.text_input(
-        "ABV (%)",
-        placeholder="e.g. 13.5",
-    )
-    st.caption(
-        "These are the only values you need to enter. "
-        "The government warning is checked against the official TTB text automatically."
-    )
+        new_staged = []
+        for zf in zip_files:
+            new_staged.extend(load_images_from_zip(zf))
+        if image_files:
+            new_staged.extend(load_images_from_upload(image_files))
  
-st.divider()
+        if new_staged:
+            st.session_state.staged_images = new_staged
+            st.session_state.active_idx    = 0
  
-# run analysis button
-run_col, _ = st.columns([1, 3])
-with run_col:
-    go = st.button("▶ Run Check", type="primary", width='stretch')
+with camera_tab:
+    st.caption("Point your camera at the label and capture it directly.")
+    camera_image = st.camera_input("Capture label")
  
-if go:
-    if not uploaded_file:
-        st.error("Please upload a label image or ZIP file first.")
-    elif not brand_input.strip():
-        st.error("Please enter the expected Brand Name.")
-    elif not abv_input.strip():
-        st.error("Please enter the expected ABV.")
-    else:
-        new_results = []
+    if camera_image:
+        pil = open_pil(camera_image.read(), "camera_capture.jpg")
+        if pil:
+            # Replace staged images with just the camera shot
+            st.session_state.staged_images = [{"name": "camera_capture.jpg", "pil": pil}]
+            st.session_state.active_idx    = 0
+            st.success("Camera image ready — fill in the expected values and run the check.")
  
-        # Zip batch
-        if uploaded_file.name.lower().endswith(".zip"):
-            zip_bytes = uploaded_file.read()
-            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-                members = zf.namelist()
-                image_members = [
-                    m for m in members
-                    if Path(m).suffix.lower() in ACCEPTED_IMAGE_EXTENSIONS
-                ]
-                skipped = [
-                    m for m in members
-                    if Path(m).suffix.lower() not in ACCEPTED_IMAGE_EXTENSIONS
-                    and not m.endswith("/")   # ignore directory entries
-                ]
  
-                if skipped:
-                    st.warning(
-                        f"Skipped {len(skipped)} non-image file(s): "
-                        + ", ".join(skipped)
-                    )
+# Preview: thumbnail strip + large preview
+staged = st.session_state.staged_images
  
-                if not image_members:
-                    st.error("No supported image files found in the ZIP.")
-                else:
-                    progress = st.progress(0, text="Processing batch…")
-                    for i, member in enumerate(image_members):
-                        img_data = zf.read(member)
-                        pil_img = Image.open(io.BytesIO(img_data))
-                        result = run_single(
-                            pil_img,
-                            Path(member).name,
-                            brand_input.strip(),
-                            abv_input.strip(),
-                        )
-                        new_results.append(result)
-                        progress.progress(
-                            (i + 1) / len(image_members),
-                            text=f"Processed {i+1}/{len(image_members)}: {Path(member).name}",
-                        )
-                    progress.empty()
+if staged:
+    st.divider()
+    prev_left, prev_right = st.columns([1, 3], gap="large")
  
-        # Only one image uploaded
-        else:
-            pil_img = Image.open(uploaded_file)
-            result = run_single(
-                pil_img,
-                uploaded_file.name,
-                brand_input.strip(),
-                abv_input.strip(),
+    with prev_left:
+        st.markdown("**Queue**")
+        for i, item in enumerate(staged):
+            is_active = (i == st.session_state.active_idx)
+            border_color = "#1a7a4a" if is_active else "#dddddd"
+            st.markdown(
+                f'<div style="border: 3px solid {border_color}; border-radius: 6px; '
+                f'overflow: hidden; margin-bottom: 8px;">',
+                unsafe_allow_html=True,
             )
-            new_results.append(result)
+            st.image(item["pil"], caption=item["name"], use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
  
-        # history
-        st.session_state.results.extend(new_results)
+            if not is_active:
+                if st.button(f"Preview", key=f"thumb_{i}"):
+                    st.session_state.active_idx = i
+                    st.rerun()
  
-        # Show results
-        st.divider()
-        st.subheader("Results")
-        for result in new_results:
-            with st.container(border=True):
-                render_result(result)
+    with prev_right:
+        active = staged[st.session_state.active_idx]
+        st.markdown(f"**Previewing:** {active['name']}")
+        st.image(active["pil"], use_container_width=True)
+ 
+
+    # Expected values
+    st.divider()
+    val_left, val_right = st.columns([1, 1], gap="large")
+ 
+    with val_left:
+        st.subheader("Expected Values")
+        brand_input = st.text_input(
+            "Brand Name",
+            placeholder="Exactly as it should appear on the label",
+        )
+        abv_input = st.text_input(
+            "ABV (%)",
+            placeholder="e.g. 13.5",
+        )
+        st.caption(
+            "These values apply to all images in the queue. "
+            "The government warning is checked against the official TTB text automatically."
+        )
+ 
+    with val_right:
+        st.subheader(f"Queue Summary")
+        st.metric("Images ready to check", len(staged))
+        if not HEIC_SUPPORTED:
+            st.info("💡 Install `pillow-heif` to enable HEIC/iPhone photo support.")
+ 
+    st.divider()
+ 
+    # Run and clear button
+    run_col, clear_col, _ = st.columns([1, 1, 2])
+    with run_col:
+        go = st.button("▶ Run Check", type="primary", use_container_width=True)
+    with clear_col:
+        if st.button("🗑 Clear Queue", use_container_width=True):
+            st.session_state.staged_images = []
+            st.session_state.active_idx    = 0
+            st.rerun()
+ 
+    # Processing
+    if go:
+        if not brand_input.strip():
+            st.error("Please enter the expected Brand Name.")
+        elif not abv_input.strip():
+            st.error("Please enter the expected ABV.")
+        else:
+            new_results = []
+            progress    = st.progress(0, text="Starting…")
+ 
+            for i, item in enumerate(staged):
+                progress.progress(
+                    i / len(staged),
+                    text=f"Processing {i+1}/{len(staged)}: {item['name']}",
+                )
+                result = run_single(
+                    item["pil"],
+                    item["name"],
+                    brand_input.strip(),
+                    abv_input.strip(),
+                )
+                new_results.append(result)
+ 
+            progress.progress(1.0, text="Done!")
+            progress.empty()
+ 
+            st.session_state.results.extend(new_results)
+ 
+            st.divider()
+            st.subheader("Results")
+            for result in new_results:
+                with st.container(border=True):
+                    render_result(result)
+ 
+else:
+    # No images staged yet
+    st.divider()
+    st.info("👆 Upload images or use the camera tab above to get started.")
  
  
-# Session history
+# Session history summary
 if st.session_state.results:
     st.divider()
  
-    total  = len(st.session_state.results)
-    passes = sum(1 for r in st.session_state.results if r["overall"] == PASS)
-    fails  = sum(1 for r in st.session_state.results if r["overall"] == FAIL)
-    reviews= sum(1 for r in st.session_state.results if r["overall"] == REVIEW)
+    total   = len(st.session_state.results)
+    passes  = sum(1 for r in st.session_state.results if r["overall"] == PASS)
+    fails   = sum(1 for r in st.session_state.results if r["overall"] == FAIL)
+    reviews = sum(1 for r in st.session_state.results if r["overall"] == REVIEW)
  
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Total Checked", total)
-    m2.metric("✅ Pass",  passes)
-    m3.metric("⚠️ Review", reviews)
-    m4.metric("❌ Fail",  fails)
+    m2.metric("✅ Pass",       passes)
+    m3.metric("⚠️ Review",    reviews)
+    m4.metric("❌ Fail",       fails)
  
-    # ── Export button ──
     export_col, clear_col, _ = st.columns([1, 1, 2])
  
     with export_col:
@@ -309,10 +437,12 @@ if st.session_state.results:
             data=zip_bytes,
             file_name=EXPORT_ZIP_NAME,
             mime="application/zip",
-            width='stretch',
+            use_container_width=True,
         )
  
     with clear_col:
-        if st.button("🗑 Clear Session", width='stretch'):
-            st.session_state.results = []
+        if st.button("🗑 Clear Session", use_container_width=True):
+            st.session_state.results       = []
+            st.session_state.staged_images = []
+            st.session_state.active_idx    = 0
             st.rerun()

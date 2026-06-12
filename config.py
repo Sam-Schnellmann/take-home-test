@@ -1,7 +1,7 @@
 # Statuses for the app
-PASS = "PASS"
+PASS   = "PASS"
 REVIEW = "REVIEW"
-FAIL = "FAIL"
+FAIL   = "FAIL"
  
 # Government Warning
 #  Label must match exactly, including spaces and punctuation.
@@ -46,7 +46,7 @@ FIELD_LABELS = {
 }
  
 # Accepted image formats
-ACCEPTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+ACCEPTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
  
 # Anthropic model — used for both OCR and AI explanations
 ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
