@@ -1,9 +1,10 @@
 import anthropic
+import streamlit as st
  
 from config import PASS, REVIEW, FAIL, ANTHROPIC_MODEL, FIELD_LABELS
  
 # Anthropic client — reads ANTHROPIC_API_KEY from environment automatically
-_client = anthropic.Anthropic()
+_client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
  
  
 def _build_prompt(validation_result: dict, filename: str) -> str:

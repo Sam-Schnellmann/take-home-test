@@ -6,9 +6,11 @@ import anthropic
 from PIL import Image
  
 from config import ANTHROPIC_MODEL
+
+import streamlit as st
  
 # Anthropic client — reads ANTHROPIC_API_KEY from environment automatically
-_client = anthropic.Anthropic()
+_client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
  
  
 def _pil_to_base64(pil_image: Image.Image) -> str:
