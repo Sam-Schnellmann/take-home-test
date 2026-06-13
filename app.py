@@ -105,11 +105,11 @@ if "rotations"     not in st.session_state:
 
 def rotate_left():
     idx = st.session_state.active_idx
-    st.session_state.rotations[idx] = (st.session_state.rotations[idx] + 90) % 360
+    st.session_state.rotations[idx] = (st.session_state.rotations[idx] - 90) % 360
 
 def rotate_right():
     idx = st.session_state.active_idx
-    st.session_state.rotations[idx] = (st.session_state.rotations[idx] - 90) % 360
+    st.session_state.rotations[idx] = (st.session_state.rotations[idx] + 90) % 360
 
 def set_active(i):
     st.session_state.active_idx = i
@@ -297,9 +297,12 @@ with upload_tab:
             new_staged.extend(load_images_from_upload(image_files))
 
         if new_staged:
-            st.session_state.staged_images = new_staged
-            st.session_state.active_idx    = 0
-            st.session_state.rotations     = [0] * len(new_staged)
+            new_names = [i["name"] for i in new_staged]
+            old_names = [i["name"] for i in st.session_state.staged_images]
+            if new_names != old_names:
+                st.session_state.staged_images = new_staged
+                st.session_state.active_idx    = 0
+                st.session_state.rotations     = [0] * len(new_staged)
 
 with camera_tab:
     st.caption("Point your camera at the label and capture it directly.")
@@ -308,9 +311,11 @@ with camera_tab:
     if camera_image:
         pil = open_pil(camera_image.read(), "camera_capture.jpg")
         if pil:
-            st.session_state.staged_images = [{"name": "camera_capture.jpg", "pil": pil}]
-            st.session_state.active_idx    = 0
-            st.session_state.rotations     = [0]
+            current_names = [i["name"] for i in st.session_state.staged_images]
+            if current_names != ["camera_capture.jpg"]:
+                st.session_state.staged_images = [{"name": "camera_capture.jpg", "pil": pil}]
+                st.session_state.active_idx    = 0
+                st.session_state.rotations     = [0]
             st.success("Camera image ready — fill in the expected values and run the check.")
 
 
@@ -339,7 +344,7 @@ if staged:
                 f'overflow: hidden; margin-bottom: 4px;">',
                 unsafe_allow_html=True,
             )
-            st.image(get_rotated(i), caption=item["name"], use_container_width=True)
+            st.image(get_rotated(i), caption=item["name"], width='stretch')
             st.markdown("</div>", unsafe_allow_html=True)
             if not is_active:
                 st.button(
@@ -357,9 +362,9 @@ if staged:
         # Rotation buttons using callbacks — this is what makes them work
         rot_col1, rot_col2, rot_col3 = st.columns([1, 1, 4])
         with rot_col1:
-            st.button("↺ Rotate Left", on_click=rotate_left, use_container_width=True)
+            st.button("↺ Rotate Left", on_click=rotate_right, width='stretch')
         with rot_col2:
-            st.button("↻ Rotate Right", on_click=rotate_right, use_container_width=True)
+            st.button("↻ Rotate Right", on_click=rotate_left, width='stretch')
         with rot_col3:
             current_rot = st.session_state.rotations[active_idx]
             if current_rot != 0:
@@ -367,7 +372,7 @@ if staged:
             else:
                 st.caption("Use the buttons if this photo loaded sideways or upside-down.")
 
-        st.image(get_rotated(active_idx), use_container_width=True)
+        st.image(get_rotated(active_idx), width='stretch')
 
     # ── Expected values ───────────────────────────────────────────────────────
 
@@ -401,9 +406,9 @@ if staged:
 
     run_col, clear_col, _ = st.columns([1, 1, 2])
     with run_col:
-        go = st.button("▶ Run Check", type="primary", use_container_width=True)
+        go = st.button("▶ Run Check", type="primary", width='stretch')
     with clear_col:
-        if st.button("🗑 Clear Queue", use_container_width=True):
+        if st.button("🗑 Clear Queue", width='stretch'):
             st.session_state.staged_images = []
             st.session_state.rotations     = []
             st.session_state.active_idx    = 0
@@ -472,11 +477,11 @@ if st.session_state.results:
             data=zip_bytes,
             file_name=EXPORT_ZIP_NAME,
             mime="application/zip",
-            use_container_width=True,
+            width='stretch',
         )
 
     with clear_col:
-        if st.button("🗑 Clear Session", use_container_width=True):
+        if st.button("🗑 Clear Session", width='stretch'):
             st.session_state.results       = []
             st.session_state.staged_images = []
             st.session_state.rotations     = []
