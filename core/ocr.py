@@ -64,7 +64,7 @@ Return ONLY a valid JSON object with exactly these keys. Do not include any expl
 {
   "raw_text": "<all visible text on the label, exactly as printed>",
   "brand_name": "<the brand or product name, exactly as it appears — preserve capitalization>",
-  "abv": "<just the numeric ABV value, e.g. 13.5 — no % sign>",
+  "abv": "<the numeric ABV value only — e.g. 4.2 — no % sign, no units>",
   "government_warning": "<the full government warning block, exactly as printed including header>",
   "secondary": {
     "bottler_name_address": "<bottler or producer name and address, or null>",
@@ -76,10 +76,26 @@ Return ONLY a valid JSON object with exactly these keys. Do not include any expl
   }
 }
 
-Use null (not the string "null") for any field you cannot find on the label.
-For brand_name, preserve exact capitalization and punctuation as printed.
-For abv, return only the number — no % sign, no units.
-For government_warning, copy the full text exactly as it appears on the label."""
+CRITICAL EXTRACTION RULES:
+
+For brand_name:
+- Copy the brand/product name EXACTLY as it appears on the label.
+- Preserve every capital and lowercase letter. "STONE'S THROW" and "Stone's Throw" are diffrent.
+
+For abv:
+- TTB-compliant labels state ABI in one of these formats:
+    "Alcohol X% by Volume" OR "X% Alc. by Vol." OR "X% Alc./Vol."
+- Extract ONLY the number (e.g. 4.2, 13.5, 40). Do not include the % sign or any words.
+- If you see a percentage on the label that looks like an alcohol content, that is the ABV.
+- On cans the ABV is often printed on the side panel — look carefully
+
+For government_warning:
+- The header "GOVERNMENT WARNING:" must be in ALL CAPS and hold on the label.
+- The body has two numbered statements: (1) the Surgeon General pregnancy warning and (2) the impairment warning.
+- Copy the ENTIRE block exactly as it is printed. Do not summarize or paraphrase.
+- Even if the text is small or partially obscured, extract every word you can see.
+
+Use null (JSON null, not the string "null") for any field you cannot find."""
 
     try:
         response = _client.messages.create(

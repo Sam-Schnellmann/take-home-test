@@ -40,15 +40,27 @@ def validate_brand_name(extracted: str | None, expected: str) -> dict:
         }
 
     if extracted_norm.upper() == expected_norm.upper():
-        hint = "Capitalization mismatch: check case on every word."
-    else:
-        hint = f'Label reads "{extracted_norm}", expected "{expected_norm}".'
+        return {
+            "status": REVIEW,
+            "extracted": extracted_norm,
+            "expected": expected_norm,
+            "message": (
+                f'Capitalization mismatch: label reads "{extracted_norm}", '
+                f'expected "{expected_norm}". '
+                "Verify the exact casing on the physical label."
+            ),
+        }
+
+    #     hint = "Capitalization mismatch: check case on every word."
+    # else:
+    #     hint = f'Label reads "{extracted_norm}", expected "{expected_norm}".'
 
     return {
         "status":    FAIL,
         "extracted": extracted_norm,
         "expected":  expected_norm,
-        "message":   hint,
+        # "message":   hint,
+        "message": f'Label reads "{extracted_norm}", expected "{expected_norm}".',
     }
 
 
@@ -103,78 +115,84 @@ def validate_government_warning(extracted: str | None) -> dict:
     """
     Validation rules:
       - "GOVERNMENT WARNING:" header must be exactly ALL CAPS with a colon.
-      - The body text (1) and (2) is compared case-insensitively — labels that
-        print the body in ALL CAPS (like cans) are valid as long as every word
-        and number matches.
-      - Similarity scoring:
-          100%        → PASS
-          60–99.99%   → REVIEW (likely a photo quality issue, flag for human)
-          below 60%   → FAIL   (genuinely wrong text)
-      - A REVIEW on the government warning counts as a FAIL overall.
+      - Body text is compared case-insensitively.
+      - PASS   = similarity >= 99.99%
+      - REVIEW = 60.00% <= similarity < 99.99%
+      - FAIL   = similarity < 60.00%
     """
-    canonical      = normalize_whitespace(GOVERNMENT_WARNING)
-    canonical_up   = canonical.upper()
+
+    canonical = normalize_whitespace(GOVERNMENT_WARNING)
+    canonical_up = canonical.upper()
 
     if not extracted:
         return {
-            "status":    FAIL,
+            "status": FAIL,
             "extracted": None,
-            "expected":  canonical,
-            "message":   f'"{GOVERNMENT_WARNING_HEADER}" block not found on label.',
+            "expected": canonical,
+            "message": f'"{GOVERNMENT_WARNING_HEADER}" block not found on label.',
         }
 
     extracted_norm = normalize_whitespace(extracted)
-    extracted_up   = extracted_norm.upper()
+    extracted_up = extracted_norm.upper()
 
-    # Check header capitalization first — must be exact ALL CAPS
-    if not extracted_norm.startswith("GOVERNMENT WARNING:"):
-        header_hint = ' The "GOVERNMENT WARNING:" header must be in ALL CAPS with a colon.'
+    # Header must be EXACTLY "GOVERNMENT WARNING:"
+    header_valid = extracted_norm.startswith("GOVERNMENT WARNING:")
+
+    if not header_valid:
+        header_hint = (
+            ' The "GOVERNMENT WARNING:" header must be in ALL CAPS '
+            "and include the colon."
+        )
     else:
         header_hint = ""
 
-    # Compare both strings uppercased so all-caps labels (e.g. cans) pass
-    if extracted_up == canonical_up:
-        # Words match — now verify the header casing specifically
-        if header_hint:
-            # Body is right but header casing is wrong — still a real failure
-            return {
-                "status":    FAIL,
-                "extracted": extracted_norm,
-                "expected":  canonical,
-                "message":   f"Government warning body is correct but header casing is wrong.{header_hint}",
-            }
-        return {
-            "status":    PASS,
-            "extracted": extracted_norm,
-            "expected":  canonical,
-            "message":   "Government warning is correct.",
-        }
-
-    # Not an exact match — score similarity on uppercased versions
     similarity = fuzz.ratio(extracted_up, canonical_up)
 
-    if similarity >= 60:
-        # High similarity — likely a photo quality issue, not a real label error
+    # Body matches perfectly, but header casing is wrong
+    if similarity >= 99.99 and not header_valid:
         return {
-            "status":    REVIEW,
+            "status": FAIL,
             "extracted": extracted_norm,
-            "expected":  canonical,
+            "expected": canonical,
             "message": (
-                f"Government warning could not be fully verified — image may be too dark, "
-                f"blurry, or partially obscured (similarity: {similarity:.0f}%). "
+                "Government warning text matches, but the header "
+                f'format is incorrect.{header_hint}'
+            ),
+        }
+
+    # PASS
+    if similarity >= 99.99:
+        return {
+            "status": PASS,
+            "extracted": extracted_norm,
+            "expected": canonical,
+            "message": "Government warning is correct.",
+        }
+
+    # REVIEW
+    if similarity >= 60:
+        return {
+            "status": REVIEW,
+            "extracted": extracted_norm,
+            "expected": canonical,
+            "message": (
+                "Government warning could not be fully verified. "
+                "Image may be blurry, dark, low resolution, or partially obscured. "
+                f"(similarity: {similarity:.2f}%). "
                 f"Please manually review the physical label.{header_hint}"
             ),
         }
 
-    # Low similarity — genuinely wrong text
+    # FAIL
     return {
-        "status":    FAIL,
+        "status": FAIL,
         "extracted": extracted_norm,
-        "expected":  canonical,
+        "expected": canonical,
         "message": (
-            f"Government warning does not match required text "
-            f"(similarity: {similarity:.0f}%). "
-            f"Check wording, spelling, capitalization, and numbering.{header_hint}"
+            "Government warning does not match required text "
+            f"(similarity: {similarity:.2f}%). "
+            f"Check wording, spelling, capitalization, numbering, and punctuation."
+            f"{header_hint}"
         ),
     }
 
@@ -211,23 +229,29 @@ def validate_label(ocr_data: dict, user_brand: str, user_abv: str) -> dict:
     warning_result    = validate_government_warning(ocr_data.get("government_warning"))
     secondary_results = validate_secondary_fields(ocr_data.get("secondary", {}))
 
-    big3_statuses = [
-        brand_result["status"],
-        abv_result["status"],
-        warning_result["status"],
-    ]
-
-    # REVIEW on the government warning counts as a FAIL overall —
-    # it must be fully verified, not just probably correct
-    if FAIL in big3_statuses or warning_result["status"] == REVIEW:
+    # FAIL takes precedence
+    if (
+        brand_result["status"] == FAIL
+        or abv_result["status"] == FAIL
+        or warning_result["status"] == FAIL
+    ):
         overall = FAIL
+
+    # REVIEW is next
+    elif (
+        brand_result["status"] == REVIEW
+        or abv_result["status"] == REVIEW
+        or warning_result["status"] == REVIEW
+        or any(
+            result["status"] == REVIEW
+            for result in secondary_results.values()
+        )
+    ):
+        overall = REVIEW
+
+    # Everything else must be PASS
     else:
-        missing = [
-            FIELD_LABELS[k]
-            for k, v in secondary_results.items()
-            if v["status"] == REVIEW
-        ]
-        overall = REVIEW if missing else PASS
+        overall = PASS
 
     missing_secondary = [
         FIELD_LABELS[k]
@@ -236,10 +260,10 @@ def validate_label(ocr_data: dict, user_brand: str, user_abv: str) -> dict:
     ]
 
     return {
-        "overall":           overall,
-        "brand_name":        brand_result,
-        "abv":               abv_result,
+        "overall": overall,
+        "brand_name": brand_result,
+        "abv": abv_result,
         "government_warning": warning_result,
-        "secondary":         secondary_results,
+        "secondary": secondary_results,
         "missing_secondary": missing_secondary,
     }
