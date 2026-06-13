@@ -25,20 +25,12 @@ def _flatten(result: dict) -> dict:
         "Explanation": result.get("explanation", ""),
     }
  
-    # Big 3 required fields
     for field in ["brand_name", "abv", "government_warning"]:
         r     = result.get(field, {})
         label = FIELD_LABELS.get(field, field)   # e.g. "Brand Name"
         row[f"{label} Status"]    = r.get("status", "")
         row[f"{label} Extracted"] = r.get("extracted", "")
         row[f"{label} Expected"]  = r.get("expected", "")
-        row[f"{label} Note"]      = r.get("message", "")
- 
-    # Secondary fields
-    for field, r in result.get("secondary", {}).items():
-        label = FIELD_LABELS.get(field, field)
-        row[f"{label} Status"]    = r.get("status", "")
-        row[f"{label} Extracted"] = r.get("extracted", "")
         row[f"{label} Note"]      = r.get("message", "")
  
     return row

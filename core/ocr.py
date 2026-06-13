@@ -65,16 +65,14 @@ Return ONLY a valid JSON object with exactly these keys. Do not include any expl
   "raw_text": "<all visible text on the label, exactly as printed>",
   "brand_name": "<the brand or product name, exactly as it appears — preserve capitalization>",
   "abv": "<the numeric ABV value only — e.g. 4.2 — no % sign, no units>",
-  "government_warning": "<the full government warning block, exactly as printed including header>",
-  "secondary": {
-    "bottler_name_address": "<bottler or producer name and address, or null>",
-    "varietal_designation": "<wine/spirit type e.g. Chardonnay, Bourbon, IPA, or null>",
-    "appellation_of_origin": "<region/country of origin e.g. Napa Valley, Kentucky, or null>",
-    "vintage_date": "<4-digit vintage year, or null>",
-    "net_volume": "<volume with unit e.g. 750 mL, 1 PINT, or null>",
-    "sulfite_declaration": "<sulfite statement if present, or null>"
-  }
+  "government_warning": "<the full government warning block, exactly as printed including header>"
 }
+
+VERBATIM TEXT RULE:
+All extracted text must be copied exactly as it appears on the label, including all punctuation (periods, commas, colons, apostrophes, quotation marks, parentheses) and line breaks. Do not normalize or remove punctuation.
+
+NO EDITING RULE:
+Do not correct spelling, grammar, spacing, or punctuation. Do not guess unclear characters.
 
 CRITICAL EXTRACTION RULES:
 
@@ -138,7 +136,6 @@ Use null (JSON null, not the string "null") for any field you cannot find."""
             "brand_name":         data.get("brand_name") or None,
             "abv":                data.get("abv") or None,
             "government_warning": data.get("government_warning") or None,
-            "secondary":          data.get("secondary") or {},
         }
 
     except Exception as e:
@@ -149,6 +146,5 @@ Use null (JSON null, not the string "null") for any field you cannot find."""
             "brand_name":         None,
             "abv":                None,
             "government_warning": None,
-            "secondary":          {},
             "_error":             str(e),
         }

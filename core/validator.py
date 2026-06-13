@@ -4,8 +4,9 @@ from rapidfuzz import fuzz
 from config import (
     PASS, REVIEW, FAIL,
     GOVERNMENT_WARNING, GOVERNMENT_WARNING_HEADER,
-    SECONDARY_FIELDS, FIELD_LABELS,
 )
+
+from core.analyzer import get_government_warning_analysis
 
 
 def normalize_whitespace(text: str) -> str:
@@ -171,6 +172,10 @@ def validate_government_warning(extracted: str | None) -> dict:
 
     # REVIEW
     if similarity >= 60:
+        # Get specific differences from Claude
+        specific_analysis = get_government_warning_analysis(extracted_norm, canonical)
+        analysis_note = f"\n\n{specific_analysis}" if specific_analysis else ""
+        
         return {
             "status": REVIEW,
             "extracted": extracted_norm,
@@ -179,9 +184,23 @@ def validate_government_warning(extracted: str | None) -> dict:
                 "Government warning could not be fully verified. "
                 "Image may be blurry, dark, low resolution, or partially obscured. "
                 f"(similarity: {similarity:.2f}%). "
-                f"Please manually review the physical label.{header_hint}"
+                f"Please manually review the physical label.{analysis_note}"
+                f"{header_hint}"
             ),
         }
+
+
+        # return {
+        #     "status": REVIEW,
+        #     "extracted": extracted_norm,
+        #     "expected": canonical,
+        #     "message": (
+        #         "Government warning could not be fully verified. "
+        #         "Image may be blurry, dark, low resolution, or partially obscured. "
+        #         f"(similarity: {similarity:.2f}%). "
+        #         f"Please manually review the physical label.\n\n{header_hint}"
+        #     ),
+        # }
 
     # FAIL
     return {
@@ -192,42 +211,17 @@ def validate_government_warning(extracted: str | None) -> dict:
             "Government warning does not match required text "
             f"(similarity: {similarity:.2f}%). "
             f"Check wording, spelling, capitalization, numbering, and punctuation."
-            f"{header_hint}"
+            f"\n\n{header_hint}"
         ),
     }
-
-
-# ── Secondary Fields ──────────────────────────────────────────────────────────
-
-def validate_secondary_fields(extracted_secondary: dict) -> dict:
-    """
-    REVIEW if missing; PASS if present (no exact-match for secondary fields).
-    """
-    results = {}
-    for field in SECONDARY_FIELDS:
-        value = extracted_secondary.get(field)
-        if value:
-            results[field] = {
-                "status":    PASS,
-                "extracted": value,
-                "message":   f"{FIELD_LABELS[field]} found.",
-            }
-        else:
-            results[field] = {
-                "status":    REVIEW,
-                "extracted": None,
-                "message":   f"{FIELD_LABELS[field]} not found on label.",
-            }
-    return results
 
 
 # ── Master Validation ─────────────────────────────────────────────────────────
 
 def validate_label(ocr_data: dict, user_brand: str, user_abv: str) -> dict:
-    brand_result      = validate_brand_name(ocr_data.get("brand_name"), user_brand)
-    abv_result        = validate_abv(ocr_data.get("abv"), user_abv)
-    warning_result    = validate_government_warning(ocr_data.get("government_warning"))
-    secondary_results = validate_secondary_fields(ocr_data.get("secondary", {}))
+    brand_result   = validate_brand_name(ocr_data.get("brand_name"), user_brand)
+    abv_result     = validate_abv(ocr_data.get("abv"), user_abv)
+    warning_result = validate_government_warning(ocr_data.get("government_warning"))
 
     # FAIL takes precedence
     if (
@@ -237,33 +231,20 @@ def validate_label(ocr_data: dict, user_brand: str, user_abv: str) -> dict:
     ):
         overall = FAIL
 
-    # REVIEW is next
+    # REVIEW if brand name or government warning need manual check
     elif (
         brand_result["status"] == REVIEW
-        or abv_result["status"] == REVIEW
         or warning_result["status"] == REVIEW
-        or any(
-            result["status"] == REVIEW
-            for result in secondary_results.values()
-        )
     ):
         overall = REVIEW
 
-    # Everything else must be PASS
+    # Everything else is PASS
     else:
         overall = PASS
 
-    missing_secondary = [
-        FIELD_LABELS[k]
-        for k, v in secondary_results.items()
-        if v["status"] == REVIEW
-    ]
-
     return {
-        "overall": overall,
-        "brand_name": brand_result,
-        "abv": abv_result,
+        "overall":            overall,
+        "brand_name":         brand_result,
+        "abv":                abv_result,
         "government_warning": warning_result,
-        "secondary": secondary_results,
-        "missing_secondary": missing_secondary,
     }

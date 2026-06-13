@@ -18,18 +18,22 @@ GOVERNMENT_WARNING_HEADER = "GOVERNMENT WARNING:"
  
 # The Big 3 — these must pass for an overall PASS. Any failure -> FAIL
 BIG_3 = ["brand_name", "abv", "government_warning"]
- 
+
+# After reviewing the interviews again. No one talks about these secondary fields
+# These fields are from that proper_verification.jpg image
+# These fields also only apply to wines
+#
 # Secondary fields
 #  missing fields -> REVIEW (if Big 3 all pass)
 #  present but unreadable or wrong -> REVIEW
-SECONDARY_FIELDS = [
-    "bottler_name_address",
-    "varietal_designation",
-    "appellation_of_origin",
-    "vintage_date",
-    "net_volume",
-    "sulfite_declaration",
-]
+# SECONDARY_FIELDS = [
+#     "bottler_name_address",
+#     "varietal_designation",
+#     "appellation_of_origin",
+#     "vintage_date",
+#     "net_volume",
+#     "sulfite_declaration",
+# ]
  
 # Readable labels for display and export
 # Keys must use underscores — used everywhere in the codebase
@@ -37,12 +41,12 @@ FIELD_LABELS = {
     "brand_name":            "Brand Name",
     "abv":                   "ABV (%)",
     "government_warning":    "Government Warning",
-    "bottler_name_address":  "Bottler Name and Address",
-    "varietal_designation":  "Varietal Designation",
-    "appellation_of_origin": "Appellation of Origin",
-    "vintage_date":          "Vintage Date",
-    "net_volume":            "Net Volume",
-    "sulfite_declaration":   "Sulfite Declaration",
+    # "bottler_name_address":  "Bottler Name and Address",
+    # "varietal_designation":  "Varietal Designation",
+    # "appellation_of_origin": "Appellation of Origin",
+    # "vintage_date":          "Vintage Date",
+    # "net_volume":            "Net Volume",
+    # "sulfite_declaration":   "Sulfite Declaration",
 }
  
 # Accepted image formats

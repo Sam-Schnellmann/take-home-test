@@ -40,450 +40,137 @@ st.set_page_config(
 st.markdown("""
 <style>
 html, body, [class*="css"] { font-family: 'Segoe UI', sans-serif; }
-
-.badge {
-    display: inline-block;
-    padding: 0.35em 1.1em;
-    border-radius: 6px;
-    font-size: 1.05rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-.badge-pass   { background: #1a7a4a; color: #ffffff; }
-.badge-review { background: #b58a00; color: #ffffff; }
-.badge-fail   { background: #c0392b; color: #ffffff; }
-
-.field-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #e0e0e0;
-}
-.field-dot {
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    margin-top: 4px;
-}
+.badge { display: inline-block; padding: 0.3em 0.9em; border-radius: 5px; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
+.badge-pass   { background: #1a7a4a; color: #fff; }
+.badge-review { background: #b58a00; color: #fff; }
+.badge-fail   { background: #c0392b; color: #fff; }
+.field-row { display: flex; align-items: flex-start; gap: 0.65rem; padding: 0.4rem 0; border-bottom: 1px solid #e8e8e8; }
+.field-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
 .dot-pass   { background: #1a7a4a; }
 .dot-review { background: #e6a817; }
 .dot-fail   { background: #c0392b; }
-.field-label { font-weight: 600; min-width: 200px; }
-.field-msg   { color: #444; font-size: 0.95rem; }
-
-.section-header {
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #888;
-    margin: 1.5rem 0 0.5rem 0;
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 4px;
-}
+.field-label { font-weight: 600; min-width: 180px; font-size: 0.9rem; }
+.field-msg   { color: #444; font-size: 0.88rem; }
+.section-header { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #999; margin: 1rem 0 0.4rem 0; border-bottom: 1px solid #e4e4e4; padding-bottom: 3px; }
+.thumb-wrap { border-radius: 6px; overflow: hidden; margin-bottom: 6px; cursor: pointer; transition: box-shadow 0.15s; }
+.preview-placeholder { background: #f2f2f2; border-radius: 8px; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; height: 200px; color: #aaa; font-size: 1rem; font-weight: 500; letter-spacing: 0.03em; }
+.result-filename { font-size: 1rem; font-weight: 700; margin: 0; }
+.block-container { padding-top: 1.5rem !important; padding-bottom: 2rem !important; }
+[data-testid="column"]:nth-child(2) img { max-height: 300px; object-fit: contain; width: auto; margin: 0 auto; }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ── Session state ─────────────────────────────────────────────────────────────
 
-if "results"       not in st.session_state:
-    st.session_state.results       = []
-if "staged_images" not in st.session_state:
-    st.session_state.staged_images = []
-if "active_idx"    not in st.session_state:
-    st.session_state.active_idx    = 0
-if "rotations"     not in st.session_state:
-    st.session_state.rotations     = []
+if "results"        not in st.session_state: st.session_state.results        = []
+if "staged_images"  not in st.session_state: st.session_state.staged_images  = []
+if "active_idx"     not in st.session_state: st.session_state.active_idx     = 0
+if "rotations"      not in st.session_state: st.session_state.rotations      = []
 
 
-# ── Rotation callbacks ────────────────────────────────────────────────────────
-# Using callbacks instead of inline button logic so state updates happen
-# before the rerun, which is what makes the preview actually change.
+# ── Helpers & Callbacks ───────────────────────────────────────────────────────
 
-def rotate_left():
-    idx = st.session_state.active_idx
-    st.session_state.rotations[idx] = (st.session_state.rotations[idx] - 90) % 360
+def rotate_left(): st.session_state.rotations[st.session_state.active_idx] = (st.session_state.rotations[st.session_state.active_idx] - 90) % 360
+def rotate_right(): st.session_state.rotations[st.session_state.active_idx] = (st.session_state.rotations[st.session_state.active_idx] + 90) % 360
+def set_active(i): st.session_state.active_idx = i
+def badge_html(status: str) -> str: return f'<span class="badge badge-{"pass" if status=="PASS" else "review" if status=="REVIEW" else "fail"}">{status}</span>'
+def dot_html(status: str) -> str: return f'<div class="field-dot dot-{"pass" if status=="PASS" else "review" if status=="REVIEW" else "fail"}"></div>'
 
-def rotate_right():
-    idx = st.session_state.active_idx
-    st.session_state.rotations[idx] = (st.session_state.rotations[idx] + 90) % 360
+def render_field_row(label, status, message, extracted=""):
+    detail = message + (f" <span style='color:#888;font-size:0.82rem;'>(read: \"{extracted}\")</span>" if extracted else "")
+    st.markdown(f'<div class="field-row">{dot_html(status)} <span class="field-label">{label}</span> <span class="field-msg">{detail}</span></div>', unsafe_allow_html=True)
 
-def set_active(i):
-    st.session_state.active_idx = i
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def badge_html(status: str) -> str:
-    css = {"PASS": "pass", "REVIEW": "review", "FAIL": "fail"}.get(status, "fail")
-    return f'<span class="badge badge-{css}">{status}</span>'
-
-
-def dot_html(status: str) -> str:
-    css = {"PASS": "pass", "REVIEW": "review", "FAIL": "fail"}.get(status, "fail")
-    return f'<div class="field-dot dot-{css}"></div>'
-
-
-def render_field_row(label: str, status: str, message: str, extracted: str = ""):
-    detail = message
-    if extracted:
-        detail += f" <span style='color:#777;font-size:0.88rem;'>(read: \"{extracted}\")</span>"
-    st.markdown(
-        f'<div class="field-row">'
-        f'  {dot_html(status)}'
-        f'  <span class="field-label">{label}</span>'
-        f'  <span class="field-msg">{detail}</span>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-
-
-def open_pil(file_bytes: bytes, filename: str) -> Image.Image | None:
-    """Open any supported image. Auto-corrects EXIF orientation."""
+def open_pil(file_bytes, filename):
     try:
-        img = Image.open(io.BytesIO(file_bytes))
-        try:
-            img = ImageOps.exif_transpose(img)
-        except Exception:
-            pass
-        return img.convert("RGB")
-    except Exception:
-        return None
-
-
-def load_images_from_upload(uploaded_files) -> list[dict]:
-    images   = []
-    skipped  = []
-    accepted = ACCEPTED_IMAGE_EXTENSIONS | {".webp", ".heic", ".heif"}
-
-    for f in uploaded_files:
-        suffix = Path(f.name).suffix.lower()
-        if suffix not in accepted:
-            skipped.append(f.name)
-            continue
-        pil = open_pil(f.read(), f.name)
-        if pil:
-            images.append({"name": f.name, "pil": pil})
-        else:
-            skipped.append(f.name)
-
-    if skipped:
-        st.warning(f"Skipped {len(skipped)} unsupported file(s): " + ", ".join(skipped))
-    return images
-
-
-def load_images_from_zip(zip_file) -> list[dict]:
-    accepted = ACCEPTED_IMAGE_EXTENSIONS | {".webp", ".heic", ".heif"}
-    images   = []
-    skipped  = []
-
-    zip_bytes = zip_file.read()
-    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-        for member in zf.namelist():
-            suffix = Path(member).suffix.lower()
-            if member.endswith("/"):
-                continue
-            if suffix not in accepted:
-                skipped.append(member)
-                continue
-            pil = open_pil(zf.read(member), member)
-            if pil:
-                images.append({"name": Path(member).name, "pil": pil})
-            else:
-                skipped.append(member)
-
-    if skipped:
-        st.warning(f"Skipped {len(skipped)} unsupported file(s): " + ", ".join(skipped))
-    return images
-
-
-def get_rotated(idx: int) -> Image.Image:
-    """Return the image at idx with its stored rotation applied."""
-    img      = st.session_state.staged_images[idx]["pil"]
-    rotation = st.session_state.rotations[idx]
-    if rotation == 0:
+        img = ImageOps.exif_transpose(Image.open(io.BytesIO(file_bytes))).convert("RGB")
         return img
-    return img.rotate(rotation, expand=True)
+    except: return None
 
+def load_images_from_upload(uploaded_files):
+    images = []
+    for f in uploaded_files:
+        pil = open_pil(f.read(), f.name)
+        if pil: images.append({"name": f.name, "pil": pil})
+    return images
 
-def run_single(pil_image: Image.Image, filename: str, brand: str, abv: str) -> dict:
-    with st.spinner("Reading label…"):
-        ocr_data = process_image(pil_image)
+def get_rotated(idx):
+    img = st.session_state.staged_images[idx]["pil"]
+    rot = st.session_state.rotations[idx]
+    return img.rotate(rot, expand=True) if rot != 0 else img
 
-    with st.spinner("Validating fields…"):
-        validation = validate_label(ocr_data, brand, abv)
+def run_single(pil_image, filename, brand, abv):
+    ocr_data = process_image(pil_image)
+    validation = validate_label(ocr_data, brand, abv)
+    explanation = get_explanation(validation, filename) if validation["overall"] != PASS else ""
+    return {"filename": filename, "timestamp": datetime.now().isoformat(), "overall": validation["overall"], "explanation": explanation, **{k: v for k, v in validation.items() if k != "overall"}}
 
-    explanation = ""
-    if validation["overall"] != PASS:
-        with st.spinner("Generating explanation…"):
-            explanation = get_explanation(validation, filename)
-
-    return {
-        "filename":    filename,
-        "timestamp":   datetime.now().isoformat(timespec="seconds"),
-        "overall":     validation["overall"],
-        "explanation": explanation,
-        **{k: v for k, v in validation.items() if k not in ("overall",)},
-    }
-
-
-def render_result(result: dict):
-    overall = result["overall"]
-
+def render_result(result):
     col1, col2 = st.columns([3, 1])
-    with col1:
-        st.markdown(f"### {result['filename']}")
-    with col2:
-        st.markdown(badge_html(overall), unsafe_allow_html=True)
-
+    col1.markdown(f'<p class="result-filename">📄 {result["filename"]}</p>', unsafe_allow_html=True)
+    col2.markdown(badge_html(result["overall"]), unsafe_allow_html=True)
     st.markdown('<div class="section-header">Required Fields</div>', unsafe_allow_html=True)
     for field in ["brand_name", "abv", "government_warning"]:
         r = result.get(field, {})
-        render_field_row(
-            FIELD_LABELS[field],
-            r.get("status", FAIL),
-            r.get("message", ""),
-            r.get("extracted", "") or "",
-        )
-
-    st.markdown('<div class="section-header">Secondary Fields</div>', unsafe_allow_html=True)
-    for field, r in result.get("secondary", {}).items():
-        render_field_row(
-            FIELD_LABELS[field],
-            r.get("status", REVIEW),
-            r.get("message", ""),
-            r.get("extracted", "") or "",
-        )
-
+        render_field_row(FIELD_LABELS[field], r.get("status", FAIL), r.get("message", ""), r.get("extracted", ""))
     if result.get("explanation"):
         st.markdown('<div class="section-header">AI Analysis</div>', unsafe_allow_html=True)
         st.info(result["explanation"])
 
 
-# ── Layout ────────────────────────────────────────────────────────────────────
+# ── UI Layout ─────────────────────────────────────────────────────────────────
 
-st.title("🍷 TTB Label Compliance Checker")
-st.caption("Upload a label image and enter the expected values to verify compliance.")
-st.divider()
-
-
-# ── Upload tabs ───────────────────────────────────────────────────────────────
-
-upload_tab, camera_tab = st.tabs(["📁 Upload Images", "📷 Use Camera"])
+st.markdown("## 🍷 TTB Label Compliance Checker")
+upload_tab, camera_tab = st.tabs(["📁 Upload Photos", "📷 Use Camera"])
 
 with upload_tab:
-    accepted_types = ["jpg", "jpeg", "png", "webp", "zip"]
-    if HEIC_SUPPORTED:
-        accepted_types += ["heic", "heif"]
-
-    uploaded_files = st.file_uploader(
-        "Drop images or a ZIP here — select multiple with Ctrl/Cmd+Click",
-        type=accepted_types,
-        accept_multiple_files=True,
-        label_visibility="collapsed",
-    )
-
-    if uploaded_files:
-        zip_files   = [f for f in uploaded_files if f.name.lower().endswith(".zip")]
-        image_files = [f for f in uploaded_files if not f.name.lower().endswith(".zip")]
-
-        new_staged = []
-        for zf in zip_files:
-            new_staged.extend(load_images_from_zip(zf))
-        if image_files:
-            new_staged.extend(load_images_from_upload(image_files))
-
-        if new_staged:
-            new_names = [i["name"] for i in new_staged]
-            old_names = [i["name"] for i in st.session_state.staged_images]
-            if new_names != old_names:
-                st.session_state.staged_images = new_staged
-                st.session_state.active_idx    = 0
-                st.session_state.rotations     = [0] * len(new_staged)
-
-with camera_tab:
-    st.caption("Point your camera at the label and capture it directly.")
-    camera_image = st.camera_input("Capture label")
-
-    if camera_image:
-        pil = open_pil(camera_image.read(), "camera_capture.jpg")
-        if pil:
-            current_names = [i["name"] for i in st.session_state.staged_images]
-            if current_names != ["camera_capture.jpg"]:
-                st.session_state.staged_images = [{"name": "camera_capture.jpg", "pil": pil}]
-                st.session_state.active_idx    = 0
-                st.session_state.rotations     = [0]
-            st.success("Camera image ready — fill in the expected values and run the check.")
-
-
-# ── Preview + rotation ────────────────────────────────────────────────────────
-
-staged = st.session_state.staged_images
-
-if staged:
-    st.divider()
-
-    st.warning(
-        "⚠️ **Before running — make sure your photos are upright.** "
-        "Sideways or upside-down images make it harder to read the label accurately. "
-        "Use the rotation buttons below to fix any photos that loaded incorrectly."
-    )
-
-    prev_left, prev_right = st.columns([1, 3], gap="large")
-
-    with prev_left:
-        st.markdown("**Queue**")
-        for i, item in enumerate(staged):
-            is_active    = (i == st.session_state.active_idx)
-            border_color = "#1a7a4a" if is_active else "#dddddd"
-            st.markdown(
-                f'<div style="border: 3px solid {border_color}; border-radius: 6px; '
-                f'overflow: hidden; margin-bottom: 4px;">',
-                unsafe_allow_html=True,
-            )
-            st.image(get_rotated(i), caption=item["name"], width='stretch')
-            st.markdown("</div>", unsafe_allow_html=True)
-            if not is_active:
-                st.button(
-                    "Preview",
-                    key=f"thumb_{i}",
-                    on_click=set_active,
-                    args=(i,),
-                )
-
-    with prev_right:
-        active_idx = st.session_state.active_idx
-        active     = staged[active_idx]
-        st.markdown(f"**Previewing:** {active['name']}")
-
-        # Rotation buttons using callbacks — this is what makes them work
-        rot_col1, rot_col2, rot_col3 = st.columns([1, 1, 4])
-        with rot_col1:
-            st.button("↺ Rotate Left", on_click=rotate_right, width='stretch')
-        with rot_col2:
-            st.button("↻ Rotate Right", on_click=rotate_left, width='stretch')
-        with rot_col3:
-            current_rot = st.session_state.rotations[active_idx]
-            if current_rot != 0:
-                st.caption(f"Rotated {current_rot}° — click Run Check when it looks correct.")
-            else:
-                st.caption("Use the buttons if this photo loaded sideways or upside-down.")
-
-        st.image(get_rotated(active_idx), width='stretch')
-
-    # ── Expected values ───────────────────────────────────────────────────────
-
-    st.divider()
-    val_left, val_right = st.columns([1, 1], gap="large")
-
-    with val_left:
-        st.subheader("Expected Values")
-        brand_input = st.text_input(
-            "Brand Name",
-            placeholder="Exactly as it should appear on the label",
-        )
-        abv_input = st.text_input(
-            "ABV (%)",
-            placeholder="e.g. 13.5",
-        )
-        st.caption(
-            "These values apply to all images in the queue. "
-            "The government warning is checked against the official TTB text automatically."
-        )
-
-    with val_right:
-        st.subheader("Queue Summary")
-        st.metric("Images ready to check", len(staged))
-        if not HEIC_SUPPORTED:
-            st.info("💡 Install `pillow-heif` to enable HEIC/iPhone photo support.")
-
-    st.divider()
-
-    # ── Run / Clear ───────────────────────────────────────────────────────────
-
-    run_col, clear_col, _ = st.columns([1, 1, 2])
-    with run_col:
-        go = st.button("▶ Run Check", type="primary", width='stretch')
-    with clear_col:
-        if st.button("🗑 Clear Queue", width='stretch'):
-            st.session_state.staged_images = []
-            st.session_state.rotations     = []
-            st.session_state.active_idx    = 0
+    files = st.file_uploader("Upload", type=["jpg", "jpeg", "png", "webp", "zip"], accept_multiple_files=True, label_visibility="collapsed")
+    if files:
+        new_staged = load_images_from_upload(files)
+        if new_staged != st.session_state.staged_images:
+            st.session_state.staged_images = new_staged
+            st.session_state.rotations = [0] * len(new_staged)
             st.rerun()
 
-    if go:
-        if not brand_input.strip():
-            st.error("Please enter the expected Brand Name.")
-        elif not abv_input.strip():
-            st.error("Please enter the expected ABV.")
-        else:
-            new_results = []
-            progress    = st.progress(0, text="Starting…")
+st.divider()
+col_thumbs, col_preview, col_controls = st.columns([1, 3, 2], gap="medium")
 
-            for i, item in enumerate(staged):
-                progress.progress(
-                    i / len(staged),
-                    text=f"Processing {i+1}/{len(staged)}: {item['name']}",
-                )
-                result = run_single(
-                    get_rotated(i),
-                    item["name"],
-                    brand_input.strip(),
-                    abv_input.strip(),
-                )
-                new_results.append(result)
+with col_controls:
+    brand_input = st.text_input("Brand Name", key="brand_field")
+    abv_input = st.text_input("ABV", key="abv_field")
+    go = st.button("▶ Submit", type="primary", width='stretch', disabled=not st.session_state.staged_images)
 
-            progress.progress(1.0, text="Done!")
-            progress.empty()
+# ── Validation Run (Handles processing and rerun) ─────────────────────────────
+if go:
+    if not brand_input.strip() or not abv_input.strip():
+        st.error("Please enter both Brand Name and ABV.")
+    else:
+        results = []
+        for i, item in enumerate(st.session_state.staged_images):
+            results.append(run_single(get_rotated(i), item["name"], brand_input.strip(), abv_input.strip()))
+        st.session_state.results.extend(results)
+        st.rerun()
 
-            st.session_state.results.extend(new_results)
+# ── Final UI rendering ────────────────────────────────────────────────────────
+with col_thumbs:
+    if st.session_state.staged_images:
+        for i, item in enumerate(st.session_state.staged_images):
+            st.button(item["name"][:16], key=f"thumb_{i}", on_click=set_active, args=(i,), width='stretch')
 
-            st.divider()
-            st.subheader("Results")
-            for result in new_results:
-                with st.container(border=True):
-                    render_result(result)
+with col_preview:
+    if st.session_state.staged_images:
+        st.image(get_rotated(st.session_state.active_idx), width='content')
+    else:
+        st.markdown('<div class="preview-placeholder">Waiting for image</div>', unsafe_allow_html=True)
 
-else:
-    st.divider()
-    st.info("👆 Upload images or use the camera tab above to get started.")
-
-
-# ── Session history ───────────────────────────────────────────────────────────
+with col_controls:
+    if st.session_state.results:
+        st.download_button("⬇ Download ZIP", data=build_export_zip(st.session_state.results), file_name=EXPORT_ZIP_NAME, mime="application/zip", width='stretch')
+    if st.button("🗑 Clear Session", width='stretch'):
+        st.session_state.clear()
+        st.rerun()
 
 if st.session_state.results:
     st.divider()
-
-    total   = len(st.session_state.results)
-    passes  = sum(1 for r in st.session_state.results if r["overall"] == PASS)
-    fails   = sum(1 for r in st.session_state.results if r["overall"] == FAIL)
-    reviews = sum(1 for r in st.session_state.results if r["overall"] == REVIEW)
-
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Total Checked", total)
-    m2.metric("✅ Pass",       passes)
-    m3.metric("⚠️ Review",    reviews)
-    m4.metric("❌ Fail",       fails)
-
-    export_col, clear_col, _ = st.columns([1, 1, 2])
-
-    with export_col:
-        zip_bytes = build_export_zip(st.session_state.results)
-        st.download_button(
-            label="⬇ Export Results (ZIP)",
-            data=zip_bytes,
-            file_name=EXPORT_ZIP_NAME,
-            mime="application/zip",
-            width='stretch',
-        )
-
-    with clear_col:
-        if st.button("🗑 Clear Session", width='stretch'):
-            st.session_state.results       = []
-            st.session_state.staged_images = []
-            st.session_state.rotations     = []
-            st.session_state.active_idx    = 0
-            st.rerun()
+    for result in st.session_state.results:
+        with st.container(border=True): render_result(result)
