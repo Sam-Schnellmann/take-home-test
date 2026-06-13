@@ -120,10 +120,9 @@ def render_result(result):
 
 # ── UI Layout ─────────────────────────────────────────────────────────────────
 
-st.markdown("## 🍷 TTB Label Compliance Checker")
-upload_tab, camera_tab = st.tabs(["📁 Upload Photos", "📷 Use Camera"])
-
-with upload_tab:
+st.markdown("## 🍷 TTB Label Compliance Checker\n\n" \
+"Upload photos below")
+with st.container():
     files = st.file_uploader("Upload", type=["jpg", "jpeg", "png", "webp", "zip"], accept_multiple_files=True, label_visibility="collapsed")
     if files:
         new_staged = load_images_from_upload(files)
@@ -145,9 +144,16 @@ if go:
     if not brand_input.strip() or not abv_input.strip():
         st.error("Please enter both Brand Name and ABV.")
     else:
+        # results = []
+        # for i, item in enumerate(st.session_state.staged_images):
+        #     results.append(run_single(get_rotated(i), item["name"], brand_input.strip(), abv_input.strip()))
+        # st.session_state.results.extend(results)
         results = []
+        progress = st.progress(0, text="Checking labels...")
         for i, item in enumerate(st.session_state.staged_images):
             results.append(run_single(get_rotated(i), item["name"], brand_input.strip(), abv_input.strip()))
+            progress.progress((i + 1) / len(st.session_state.staged_images), text=f"Checking {item['name']}...")
+        progress.empty()
         st.session_state.results.extend(results)
         st.rerun()
 
@@ -172,5 +178,5 @@ with col_controls:
 
 if st.session_state.results:
     st.divider()
-    for result in st.session_state.results:
+    for result in reversed(st.session_state.results):
         with st.container(border=True): render_result(result)
