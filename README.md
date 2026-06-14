@@ -1,5 +1,7 @@
 # TTB Label Compliance Checker
 
+[https://take-home-test.streamlit.app/](https://take-home-test.streamlit.app/)
+
 A prototype web application built for the U.S. Department of the Treasury take home assessment. It uses an AI powered OCR to automatically check alcohol beverage labels for TTB (Alcohol and Tobacco Tax and Trade Bureau) compliance, with a human-in-the-loop review workflow for ambiguous results.
 
 ---
