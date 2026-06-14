@@ -25,7 +25,7 @@ from core.analyzer import get_explanation
 from core.exporter import build_export_zip
 
 
-# ── Page config ───────────────────────────────────────────────────────────────
+# Page config
 
 st.set_page_config(
     page_title="TTB Label Compliance Checker",
@@ -35,7 +35,7 @@ st.set_page_config(
 )
 
 
-# ── CSS ───────────────────────────────────────────────────────────────────────
+# CSS
 
 st.markdown("""
 <style>
@@ -61,7 +61,7 @@ html, body, [class*="css"] { font-family: 'Segoe UI', sans-serif; }
 """, unsafe_allow_html=True)
 
 
-# ── Session state ─────────────────────────────────────────────────────────────
+# Session state
 
 if "results"        not in st.session_state: st.session_state.results        = []
 if "staged_images"  not in st.session_state: st.session_state.staged_images  = []
@@ -70,7 +70,7 @@ if "rotations"      not in st.session_state: st.session_state.rotations      = [
 if "images"         not in st.session_state: st.session_state.images         = {}
 
 
-# ── Helpers & Callbacks ───────────────────────────────────────────────────────
+# Helpers & Callbacks
 
 def rotate_left(): st.session_state.rotations[st.session_state.active_idx] = (st.session_state.rotations[st.session_state.active_idx] - 90) % 360
 def rotate_right(): st.session_state.rotations[st.session_state.active_idx] = (st.session_state.rotations[st.session_state.active_idx] + 90) % 360
@@ -161,9 +161,9 @@ def review_dialog(result_idx: int):
         st.warning("Image not available for preview.")
 
 
-# ── UI Layout ─────────────────────────────────────────────────────────────────
+# UI Layout
 
-st.markdown("## 🍷 TTB Label Compliance Checker\n\n" \
+st.markdown("##TTB Label Compliance Checker\n\n" \
 "Upload photos below, enter the brand name and alcohol by volume you wish to compare, then scroll down for your results.\n\n\n" \
 "Results can either be:\n\n" \
 "1.) PASS - all three field requirements (Brand Name, ABV, and Government Warning) pass.\n\n" \
@@ -189,15 +189,11 @@ with col_controls:
     abv_input = st.text_input("ABV", key="abv_field")
     go = st.button("▶ Submit", type="primary", width='stretch', disabled=not st.session_state.staged_images)
 
-# ── Validation Run (Handles processing and rerun) ─────────────────────────────
+# Validation Run (Handles processing and rerun)
 if go:
     if not brand_input.strip() or not abv_input.strip():
         st.error("Please enter both Brand Name and ABV.")
     else:
-        # results = []
-        # for i, item in enumerate(st.session_state.staged_images):
-        #     results.append(run_single(get_rotated(i), item["name"], brand_input.strip(), abv_input.strip()))
-        # st.session_state.results.extend(results)
         results = []
         progress = progress_placeholder.progress(0, text="Checking labels...")
         for i, item in enumerate(st.session_state.staged_images):
@@ -208,7 +204,7 @@ if go:
         st.session_state.results.extend(results)
         st.rerun()
 
-# ── Final UI rendering ────────────────────────────────────────────────────────
+# Final UI rendering
 with col_thumbs:
     if st.session_state.staged_images:
         for i, item in enumerate(st.session_state.staged_images):
@@ -223,10 +219,6 @@ with col_preview:
 with col_controls:
     if st.session_state.results:
         st.download_button("⬇ Download ZIP", data=build_export_zip(st.session_state.results), file_name=EXPORT_ZIP_NAME, mime="application/zip", width='stretch')
-    # if st.button("🗑 Clear Session", width='stretch'):
-    #     st.session_state.clear()
-    #     st.cache_data.clear()
-    #     st.rerun()
 
 if st.session_state.results:
     st.divider()

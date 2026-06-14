@@ -28,7 +28,7 @@ def check_required_periods(text: str) -> list[str]:
     missing = []
     text_lower = text.lower()
     for token in REQUIRED_PERIODS:
-        word = token.rstrip(".")          # e.g. "defects"
+        word = token.rstrip(".") # "defects"
         # The word exists but the period is missing
         has_with_period    = token in text_lower
         has_without_period = bool(re.search(rf"\b{word}\b", text_lower))
@@ -37,7 +37,7 @@ def check_required_periods(text: str) -> list[str]:
     return missing
 
 
-# ── Brand Name ────────────────────────────────────────────────────────────────
+# Brand Name
 
 def validate_brand_name(extracted: str | None, expected: str) -> dict:
     if not extracted:
@@ -79,7 +79,7 @@ def validate_brand_name(extracted: str | None, expected: str) -> dict:
     }
 
 
-# ── ABV ───────────────────────────────────────────────────────────────────────
+# ABV
 
 def validate_abv(extracted: str | None, expected: str) -> dict:
     expected_clean = re.sub(r"[%\s]", "", expected).strip()
@@ -119,7 +119,7 @@ def validate_abv(extracted: str | None, expected: str) -> dict:
     }
 
 
-# ── Government Warning ────────────────────────────────────────────────────────
+# Government Warning
 
 def validate_government_warning(extracted: str | None) -> dict:
     """
@@ -147,14 +147,14 @@ def validate_government_warning(extracted: str | None) -> dict:
     extracted_norm = normalize_whitespace(extracted)
     extracted_up   = strip_punctuation(extracted_norm.upper())
 
-    # ── Layer 1: Header casing ────────────────────────────────────────────────
+    # Layer 1: Header casing
     header_valid = extracted_norm.startswith("GOVERNMENT WARNING:")
     header_hint  = (
         ' The "GOVERNMENT WARNING:" header must be in ALL CAPS and include the colon.'
         if not header_valid else ""
     )
 
-    # ── Layer 2: Explicit period check ────────────────────────────────────────
+    # Layer 2: Explicit period check
     missing_periods = check_required_periods(extracted_norm)
     period_hint = ""
     if missing_periods:
@@ -164,7 +164,7 @@ def validate_government_warning(extracted: str | None) -> dict:
             "these are easy to miss in small print. Please verify on the physical label."
         )
 
-    # ── Layer 3: Fuzzy match (punctuation-stripped, uppercased) ───────────────
+    # Layer 3: Fuzzy match (punctuation-stripped, uppercased)
     similarity = fuzz.ratio(extracted_up, canonical_up)
 
     # Perfect text but wrong header caps
@@ -176,7 +176,8 @@ def validate_government_warning(extracted: str | None) -> dict:
             "message":   f"Government warning text matches, but the header format is incorrect.{header_hint}",
         }
 
-    # PASS — text matches and periods are present (or OCR found them)
+    # PASS
+    # Text matches and periods are present (or OCR found them)
     if similarity >= 99 and not missing_periods:
         return {
             "status":    PASS,
@@ -185,7 +186,8 @@ def validate_government_warning(extracted: str | None) -> dict:
             "message":   "Government warning is correct.",
         }
 
-    # PASS text score but periods flagged — bump to REVIEW
+    # PASS text score but periods flagged
+    # Bump to REVIEW
     if similarity >= 99 and missing_periods:
         return {
             "status":    REVIEW,
@@ -228,7 +230,7 @@ def validate_government_warning(extracted: str | None) -> dict:
     }
 
 
-# ── Master Validation ─────────────────────────────────────────────────────────
+# Master Validation
 
 def validate_label(ocr_data: dict, user_brand: str, user_abv: str) -> dict:
     brand_result   = validate_brand_name(ocr_data.get("brand_name"), user_brand)

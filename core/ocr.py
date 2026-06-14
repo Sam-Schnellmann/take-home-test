@@ -12,7 +12,7 @@ from config import ANTHROPIC_MODEL
 _client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
 
 
-# ── Image prep ────────────────────────────────────────────────────────────────
+# Image prep
 
 def _pil_to_base64(pil_image: Image.Image) -> str:
     """
@@ -25,7 +25,8 @@ def _pil_to_base64(pil_image: Image.Image) -> str:
       keeps the file small enough to send reliably while preserving enough
       detail for Haiku to read text accurately.
     """
-    # Cap the longest side at 1600px — enough for text, not too big to send
+    # Cap the longest side at 1600px 
+    # Enough for text, not too big to send
     max_side = 1600
     w, h     = pil_image.size
     if max(w, h) > max_side:
@@ -40,7 +41,7 @@ def _pil_to_base64(pil_image: Image.Image) -> str:
     return base64.standard_b64encode(buf.getvalue()).decode("utf-8")
 
 
-# ── Main pipeline ─────────────────────────────────────────────────────────────
+# Main pipeline
 
 def process_image(pil_image: Image.Image) -> dict:
     """
