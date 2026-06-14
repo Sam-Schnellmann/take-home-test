@@ -163,7 +163,7 @@ def review_dialog(result_idx: int):
 
 # UI Layout
 
-st.markdown("##TTB Label Compliance Checker\n\n" \
+st.markdown("## TTB Label Compliance Checker\n\n" \
 "Upload photos below, enter the brand name and alcohol by volume you wish to compare, then scroll down for your results.\n\n\n" \
 "Results can either be:\n\n" \
 "1.) PASS - all three field requirements (Brand Name, ABV, and Government Warning) pass.\n\n" \
