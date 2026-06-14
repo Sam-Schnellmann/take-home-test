@@ -12,7 +12,7 @@ from config import ANTHROPIC_MODEL
 _client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
 
 
-# ── Image prep ────────────────────────────────────────────────────────────────
+# Image prep
 
 def _pil_to_base64(pil_image: Image.Image) -> str:
     """
@@ -25,7 +25,8 @@ def _pil_to_base64(pil_image: Image.Image) -> str:
       keeps the file small enough to send reliably while preserving enough
       detail for Haiku to read text accurately.
     """
-    # Cap the longest side at 1600px — enough for text, not too big to send
+    # Cap the longest side at 1600px 
+    # Enough for text, not too big to send
     max_side = 1600
     w, h     = pil_image.size
     if max(w, h) > max_side:
@@ -40,7 +41,7 @@ def _pil_to_base64(pil_image: Image.Image) -> str:
     return base64.standard_b64encode(buf.getvalue()).decode("utf-8")
 
 
-# ── Main pipeline ─────────────────────────────────────────────────────────────
+# Main pipeline
 
 def process_image(pil_image: Image.Image) -> dict:
     """
@@ -78,10 +79,10 @@ CRITICAL EXTRACTION RULES:
 
 For brand_name:
 - Copy the brand/product name EXACTLY as it appears on the label.
-- Preserve every capital and lowercase letter. "STONE'S THROW" and "Stone's Throw" are diffrent.
+- Preserve every capital and lowercase letter. "STONE'S THROW" and "Stone's Throw" are different.
 
 For abv:
-- TTB-compliant labels state ABI in one of these formats:
+- TTB-compliant labels state ABV in one of these formats:
     "Alcohol X% by Volume" OR "X% Alc. by Vol." OR "X% Alc./Vol."
 - Extract ONLY the number (e.g. 4.2, 13.5, 40). Do not include the % sign or any words.
 - If you see a percentage on the label that looks like an alcohol content, that is the ABV.
