@@ -86,10 +86,10 @@ def validate_abv(extracted: str | None, expected: str) -> dict:
 
     if not extracted:
         return {
-            "status":    FAIL,
+            "status":    REVIEW,
             "extracted": None,
             "expected":  expected_clean,
-            "message":   "ABV percentage could not be read from the label.",
+            "message":   "ABV percentage could not be read from the label. Please verify on the physical label",
         }
 
     try:
@@ -243,6 +243,7 @@ def validate_label(ocr_data: dict, user_brand: str, user_abv: str) -> dict:
         overall = FAIL
     elif (
         brand_result["status"] == REVIEW
+        or abv_result["status"] == REVIEW
         or warning_result["status"] == REVIEW
     ):
         overall = REVIEW

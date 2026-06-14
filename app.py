@@ -131,6 +131,14 @@ def review_dialog(result_idx: int):
     pass_clicked = col_pass.button("✅ PASS", type="primary", width='stretch')
     fail_clicked = col_fail.button("❌ FAIL", type="secondary", width='stretch')
 
+    review_fields = [
+        FIELD_LABELS[field]
+        for field in ["brand_name", "abv", "government_warning"]
+        if result[field]["status"] == REVIEW
+    ]
+    for label in review_fields:
+        st.markdown(f"Please review the **{label}**")
+
     if pass_clicked:
         for field in ["brand_name", "abv", "government_warning"]:
             if st.session_state.results[result_idx][field]["status"] == REVIEW:
@@ -156,7 +164,13 @@ def review_dialog(result_idx: int):
 # ── UI Layout ─────────────────────────────────────────────────────────────────
 
 st.markdown("## 🍷 TTB Label Compliance Checker\n\n" \
-"Upload photos below")
+"Upload photos below, enter the brand name and alcohol by volume you wish to compare, then scroll down for your results.\n\n\n" \
+"Results can either be:\n\n" \
+"1.) PASS - all three field requirements (Brand Name, ABV, and Government Warning) pass.\n\n" \
+"2.) REVIEW - a field requirement (or more) was unclear to the checker. A manual check can be processed.\n\n" \
+"3.) FAIL - a field requirement (or more) do not follow the rules that have been set.\n\n" \
+'By selecting the "Download Zip" button, you download a zip file containing the analysis results in a JSON, CSV, and EXCEL format.\n\n\n' \
+"To clear your session, please refresh the website.")
 with st.container():
     files = st.file_uploader("Upload", type=["jpg", "jpeg", "png", "webp", "zip"], accept_multiple_files=True, label_visibility="collapsed")
     if files:
@@ -165,6 +179,7 @@ with st.container():
             st.session_state.staged_images = new_staged
             st.session_state.rotations = [0] * len(new_staged)
             st.rerun()
+    progress_placeholder = st.empty()
 
 st.divider()
 col_thumbs, col_preview, col_controls = st.columns([1, 3, 2], gap="medium")
@@ -184,12 +199,12 @@ if go:
         #     results.append(run_single(get_rotated(i), item["name"], brand_input.strip(), abv_input.strip()))
         # st.session_state.results.extend(results)
         results = []
-        progress = st.progress(0, text="Checking labels...")
+        progress = progress_placeholder.progress(0, text="Checking labels...")
         for i, item in enumerate(st.session_state.staged_images):
             results.append(run_single(get_rotated(i), item["name"], brand_input.strip(), abv_input.strip()))
             st.session_state.images[item["name"]] = get_rotated(i)
             progress.progress((i + 1) / len(st.session_state.staged_images), text=f"Checking {item['name']}...")
-        progress.empty()
+        progress_placeholder.empty()
         st.session_state.results.extend(results)
         st.rerun()
 
@@ -208,9 +223,10 @@ with col_preview:
 with col_controls:
     if st.session_state.results:
         st.download_button("⬇ Download ZIP", data=build_export_zip(st.session_state.results), file_name=EXPORT_ZIP_NAME, mime="application/zip", width='stretch')
-    if st.button("🗑 Clear Session", width='stretch'):
-        st.session_state.clear()
-        st.rerun()
+    # if st.button("🗑 Clear Session", width='stretch'):
+    #     st.session_state.clear()
+    #     st.cache_data.clear()
+    #     st.rerun()
 
 if st.session_state.results:
     st.divider()
