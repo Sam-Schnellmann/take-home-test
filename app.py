@@ -67,6 +67,7 @@ if "results"        not in st.session_state: st.session_state.results        = [
 if "staged_images"  not in st.session_state: st.session_state.staged_images  = []
 if "active_idx"     not in st.session_state: st.session_state.active_idx     = 0
 if "rotations"      not in st.session_state: st.session_state.rotations      = []
+if "images"         not in st.session_state: st.session_state.images         = {}
 
 
 # ── Helpers & Callbacks ───────────────────────────────────────────────────────
@@ -105,10 +106,13 @@ def run_single(pil_image, filename, brand, abv):
     explanation = get_explanation(validation, filename) if validation["overall"] != PASS else ""
     return {"filename": filename, "timestamp": datetime.now().isoformat(), "overall": validation["overall"], "explanation": explanation, **{k: v for k, v in validation.items() if k != "overall"}}
 
-def render_result(result):
-    col1, col2 = st.columns([3, 1])
+def render_result(result, result_idx: int):
+    col1, col2, col3 = st.columns([3, 1, 1])
     col1.markdown(f'<p class="result-filename">📄 {result["filename"]}</p>', unsafe_allow_html=True)
     col2.markdown(badge_html(result["overall"]), unsafe_allow_html=True)
+    if result["overall"] == REVIEW:
+        if col3.button("🔍 Review & Check", key=f"review_{result_idx}"):
+            review_dialog(result_idx)
     st.markdown('<div class="section-header">Required Fields</div>', unsafe_allow_html=True)
     for field in ["brand_name", "abv", "government_warning"]:
         r = result.get(field, {})
@@ -116,6 +120,37 @@ def render_result(result):
     if result.get("explanation"):
         st.markdown('<div class="section-header">AI Analysis</div>', unsafe_allow_html=True)
         st.info(result["explanation"])
+
+# REVIEW & CHECK box
+@st.dialog("Review & Check", width="large")
+def review_dialog(result_idx: int):
+    result = st.session_state.results[result_idx]
+    filename = result["filename"]
+
+    col_pass, col_fail = st.columns(2)
+    pass_clicked = col_pass.button("✅ PASS", type="primary", width='stretch')
+    fail_clicked = col_fail.button("❌ FAIL", type="secondary", width='stretch')
+
+    if pass_clicked:
+        for field in ["brand_name", "abv", "government_warning"]:
+            if st.session_state.results[result_idx][field]["status"] == REVIEW:
+                st.session_state.results[result_idx][field]["status"] = PASS
+                st.session_state.results[result_idx][field]["message"] = "Manually approved."
+        st.session_state.results[result_idx]["overall"] = PASS
+        st.rerun()
+
+    if fail_clicked:
+        for field in ["brand_name", "abv", "government_warning"]:
+            if st.session_state.results[result_idx][field]["status"] == REVIEW:
+                st.session_state.results[result_idx][field]["status"] = FAIL
+                st.session_state.results[result_idx][field]["message"] = "Manually rejected."
+        st.session_state.results[result_idx]["overall"] = FAIL
+        st.rerun()
+
+    if filename in st.session_state.images:
+        st.image(st.session_state.images[filename], width='stretch')
+    else:
+        st.warning("Image not available for preview.")
 
 
 # ── UI Layout ─────────────────────────────────────────────────────────────────
@@ -152,6 +187,7 @@ if go:
         progress = st.progress(0, text="Checking labels...")
         for i, item in enumerate(st.session_state.staged_images):
             results.append(run_single(get_rotated(i), item["name"], brand_input.strip(), abv_input.strip()))
+            st.session_state.images[item["name"]] = get_rotated(i)
             progress.progress((i + 1) / len(st.session_state.staged_images), text=f"Checking {item['name']}...")
         progress.empty()
         st.session_state.results.extend(results)
@@ -178,5 +214,5 @@ with col_controls:
 
 if st.session_state.results:
     st.divider()
-    for result in reversed(st.session_state.results):
-        with st.container(border=True): render_result(result)
+    for result_idx, result in enumerate(reversed(st.session_state.results)):
+        with st.container(border=True): render_result(result, len(st.session_state.results) - 1 - result_idx)
