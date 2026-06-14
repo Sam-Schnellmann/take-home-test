@@ -78,10 +78,10 @@ CRITICAL EXTRACTION RULES:
 
 For brand_name:
 - Copy the brand/product name EXACTLY as it appears on the label.
-- Preserve every capital and lowercase letter. "STONE'S THROW" and "Stone's Throw" are diffrent.
+- Preserve every capital and lowercase letter. "STONE'S THROW" and "Stone's Throw" are different.
 
 For abv:
-- TTB-compliant labels state ABI in one of these formats:
+- TTB-compliant labels state ABV in one of these formats:
     "Alcohol X% by Volume" OR "X% Alc. by Vol." OR "X% Alc./Vol."
 - Extract ONLY the number (e.g. 4.2, 13.5, 40). Do not include the % sign or any words.
 - If you see a percentage on the label that looks like an alcohol content, that is the ABV.

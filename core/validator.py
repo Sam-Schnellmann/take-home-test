@@ -42,7 +42,7 @@ def check_required_periods(text: str) -> list[str]:
 def validate_brand_name(extracted: str | None, expected: str) -> dict:
     if not extracted:
         return {
-            "status":    FAIL,
+            "status":    REVIEW,
             "extracted": None,
             "expected":  expected,
             "message":   "Brand name could not be read from the label.",
